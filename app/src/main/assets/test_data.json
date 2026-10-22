@@ -1,0 +1,71 @@
+{
+  "base_date": "2026-10-22",
+  "space": { "space_id": 1, "space_name": "Дом", "timezone": "Europe/Moscow" },
+  "members": [
+    { "user_id": 3, "name": "Гриша" },
+    { "user_id": 4, "name": "Аня" }
+  ],
+  "pet_types": [
+    { "pet_type_id": 1, "name": "кот" },
+    { "pet_type_id": 2, "name": "собака" },
+    { "pet_type_id": 3, "name": "попугай" }
+  ],
+  "pets": [
+    {
+      "pet_id": 10, "pet_name": "Tom", "pet_type_id": 1,
+      "space_id": 1, "pet_type": "кот",
+      "features": "боится пылесоса", "allergies": "курица",
+      "intolerances": "молоко", "care_notes": "корм только сухой, 2 раза в день"
+    },
+    { "pet_id": 11, "pet_name": "Рекс", "pet_type_id": 2 },
+    { "pet_id": 12, "pet_name": "Кеша", "pet_type_id": 3, "space_id": 1 }
+  ],
+  "tasks": [
+    {
+      "task_id": 1, "task_name": "покормить", "pet_id": 10, "date_time": 1792645200,
+      "responsible_id": 4, "is_daily": true,
+      "responsible_name": "Аня", "status": "done", "occurrence_date": "2026-10-22",
+      "is_active": true, "completed_by_id": 3, "completed_by_name": "Гриша", "completed_at": 1792645800
+    },
+    {
+      "task_id": 1, "task_name": "покормить", "pet_id": 10, "date_time": 1792558800,
+      "responsible_id": 4, "is_daily": true,
+      "responsible_name": "Аня", "status": "missed", "occurrence_date": "2026-10-21", "is_active": true
+    },
+    {
+      "task_id": 2, "task_name": "расчесать", "pet_id": 10, "date_time": 1792692000,
+      "responsible_id": 3, "is_daily": true,
+      "responsible_name": "Гриша", "status": "upcoming", "occurrence_date": "2026-10-22", "is_active": true
+    },
+    {
+      "task_id": 3, "task_name": "дать таблетку от глистов", "pet_id": 10, "date_time": 1792659600,
+      "responsible_id": 4, "is_daily": false,
+      "responsible_name": "Аня", "status": "overdue"
+    },
+    {
+      "task_id": 4, "task_name": "сводить к ветеринару", "pet_id": 10, "date_time": 1792843200,
+      "responsible_id": 3, "is_daily": false,
+      "responsible_name": "Гриша", "status": "upcoming"
+    },
+    {
+      "task_id": 5, "task_name": "дать витамины", "pet_id": 10, "date_time": 1792652400,
+      "responsible_id": 4, "is_daily": true,
+      "responsible_name": "Аня", "status": "cancelled", "occurrence_date": "2026-10-22", "is_active": false
+    },
+    {
+      "task_id": 6, "task_name": "утренняя прогулка", "pet_id": 11, "date_time": 1792643400,
+      "responsible_id": 3, "is_daily": true,
+      "responsible_name": "Гриша", "status": "done", "occurrence_date": "2026-10-22",
+      "is_active": true, "completed_by_id": 4, "completed_by_name": "Аня", "completed_at": 1792644720
+    },
+    {
+      "task_id": 7, "task_name": "вечерняя прогулка", "pet_id": 11, "date_time": 1792688400,
+      "responsible_id": 3, "is_daily": true,
+      "status": "upcoming", "occurrence_date": "2026-10-22", "is_active": true
+    },
+    {
+      "task_id": 8, "task_name": "помыть лапы", "pet_id": 11, "date_time": 1792684800,
+      "responsible_id": 4, "is_daily": false
+    }
+  ]
+}
