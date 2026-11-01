@@ -53,8 +53,12 @@ data class TaskItem(
     val completedById: Long? = null,
     val completedByName: String? = null,
     val completedAt: Instant? = null,
+    /** Пространство задачи (space_id). null — сервер не прислал. */
+    val spaceId: Long? = null,
+    /** Ключ строки от сервера (item_id, например "7:2026-10-22" или "7:once"). */
+    val serverItemId: String? = null,
 ) {
     /** Уникальный ключ строки списка: у ежедневной задачи один id на много дней. */
     val key: String
-        get() = occurrenceDate?.let { "${task.id}_$it" } ?: task.id.toString()
+        get() = serverItemId ?: occurrenceDate?.let { "${task.id}_$it" } ?: task.id.toString()
 }

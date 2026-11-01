@@ -1,60 +1,72 @@
 package com.petcare.app.data.fake
 
+import com.petcare.app.data.mapper.parseZoneOrNull
+import com.petcare.app.data.remote.dto.JsonCodec
+import com.petcare.app.data.remote.dto.MemberDto
 import com.petcare.app.data.remote.dto.PetDto
 import com.petcare.app.data.remote.dto.PetTypeDto
 import com.petcare.app.data.remote.dto.SpaceDto
 import com.petcare.app.data.remote.dto.TaskDto
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** Структура файла assets/test_data.json. Внутри — DTO в формате Backend. */
-@Serializable
-data class TestDataDto(
-    /** День, к которому привязаны даты в файле. Фейк сдвигает их на «сегодня». */
-    @SerialName("base_date") val baseDate: String,
-    @SerialName("space") val space: SpaceDto,
-    @SerialName("members") val members: List<MemberDto> = emptyList(),
-    @SerialName("pet_types") val petTypes: List<PetTypeDto> = emptyList(),
-    @SerialName("pets") val pets: List<PetDto>,
-    @SerialName("tasks") val tasks: List<TaskDto>,
-)
-
-@Serializable
-data class MemberDto(
-    @SerialName("user_id") val userId: Long,
-    @SerialName("name") val name: String,
-)
-
-/** Откуда берётся сырой JSON: в приложении — из assets, в тестах — из строки. */
+/** Откуда берётся сырой JSON: в приложении — из assets, в тестах — из строки или файла. */
 fun interface RawJsonSource {
     fun read(): String
 }
 
+/** Содержимое assets/test_data.json. Внутри — объекты в формате сервера. */
+data class TestData(
+    val baseDate: LocalDate,
+    val petTypes: List<PetTypeDto>,
+    val spaces: List<SpaceDto>,
+    val members: Map<Long, List<MemberDto>>,
+    val pets: List<PetDto>,
+    val tasks: List<TaskDto>,
+)
+
+object TestDataParser {
+    /** Тот же разбор, что и для ответов сервера, — так тестовые данные проверяют и формат. */
+    fun parse(raw: String): TestData {
+        val root = JsonCodec.obj(raw)
+        fun array(key: String) = JsonCodec.parseArray(root[key] ?: error("В тестовых данных нет $key"))
+        val members = (root["members"] as? JsonObject).orEmpty().mapKeys { it.key.toLong() }
+            .mapValues { (_, v) -> JsonCodec.parseArray(v).map(JsonCodec::member) }
+        return TestData(
+            baseDate = LocalDate.parse((root["base_date"] as JsonPrimitive).contentOrNull),
+            petTypes = array("pet_types").map(JsonCodec::petType),
+            spaces = array("spaces").map(JsonCodec::space),
+            members = members,
+            pets = array("pets").map(JsonCodec::pet),
+            tasks = array("tasks").map(JsonCodec::task),
+        )
+    }
+}
+
 /**
- * Сдвигает все даты тестовых данных так, чтобы base_date стал «сегодня»
- * в часовом поясе пространства. Иначе через пару дней все задачи окажутся в прошлом.
+ * Сдвигает даты задач так, чтобы base_date стал «сегодня» в поясе пространства задачи.
+ * Иначе через пару дней все задачи окажутся в прошлом.
  */
-internal fun TestDataDto.shiftedTo(today: LocalDate): TestDataDto {
-    val zone = runCatching { ZoneId.of(space.timezone) }.getOrDefault(ZoneId.of("UTC"))
-    val days = today.toEpochDay() - LocalDate.parse(baseDate).toEpochDay()
+internal fun TestData.shiftedTo(today: LocalDate): TestData {
+    val days = today.toEpochDay() - baseDate.toEpochDay()
     if (days == 0L) return this
-
-    fun Long.shift(): Long =
-        Instant.ofEpochSecond(this).atZone(zone).plusDays(days).toEpochSecond()
-
-    fun String.shiftDate(): String =
-        runCatching { LocalDate.parse(this).plusDays(days).toString() }.getOrDefault(this)
+    val zones = spaces.associate { it.spaceId to (parseZoneOrNull(it.timezone) ?: ZoneId.of("UTC")) }
 
     return copy(
-        baseDate = today.toString(),
+        baseDate = today,
         tasks = tasks.map { t ->
+            val zone = zones[t.spaceId] ?: ZoneId.of("UTC")
+            fun Long.shift(): Long = Instant.ofEpochSecond(this).atZone(zone).plusDays(days).toEpochSecond()
+            val newDate = t.occurrenceDate?.let { runCatching { LocalDate.parse(it).plusDays(days).toString() }.getOrDefault(it) }
             t.copy(
                 dateTime = t.dateTime.shift(),
                 completedAt = t.completedAt?.shift(),
-                occurrenceDate = t.occurrenceDate?.shiftDate(),
+                occurrenceDate = newDate,
+                itemId = if (t.isDaily && newDate != null) "${t.taskId}:$newDate" else t.itemId,
             )
         },
     )
