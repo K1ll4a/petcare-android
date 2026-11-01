@@ -69,6 +69,12 @@ class SpaceTimeFormatter(
     }
 
     fun formatTime(instant: Instant): String = instant.atZone(zone).format(time)
+
+    /** «Europe/Moscow, UTC+03:00» — смещение на момент срока (учитывает летнее время). */
+    fun zoneLabel(instant: Instant): String {
+        val offset = zone.rules.getOffset(instant).id.let { if (it == "Z") "+00:00" else it }
+        return "${zone.id}, UTC$offset"
+    }
 }
 
 /** Готовая к показу строка списка — Compose ничего не вычисляет сам. */
@@ -82,6 +88,12 @@ data class TaskItemUi(
     val isDaily: Boolean,
     val isScheduleDisabled: Boolean,
     val completedText: String?,
+    /** Часовой пояс пространства у срока: «Europe/Moscow, UTC+03:00» (BR-05, задача #14). */
+    val zoneText: String = "",
+    /** id задачи — для перехода к редактированию. */
+    val taskId: Long = 0,
+    /** Можно ли менять: выполненные, пропущенные и отменённые не редактируются (FR-10). */
+    val isEditable: Boolean = false,
 )
 
 fun TaskItem.toUi(formatter: SpaceTimeFormatter): TaskItemUi = TaskItemUi(
@@ -94,6 +106,9 @@ fun TaskItem.toUi(formatter: SpaceTimeFormatter): TaskItemUi = TaskItemUi(
     isDaily = task.repeat == RepeatType.DAILY,
     isScheduleDisabled = task.repeat == RepeatType.DAILY && !task.isActive,
     completedText = if (status == TaskStatus.DONE) completedText(formatter) else null,
+    zoneText = formatter.zoneLabel(dueAt),
+    taskId = task.id,
+    isEditable = status == TaskStatus.UPCOMING || status == TaskStatus.OVERDUE || status == TaskStatus.UNKNOWN,
 )
 
 private fun TaskItem.completedText(formatter: SpaceTimeFormatter): String {
