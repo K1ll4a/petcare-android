@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -14,7 +13,7 @@ android {
         minSdk = 26 // java.time без desugaring; согласовать с NFR-07
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0-week1"
+        versionName = "0.2.0-week2"
     }
 
     buildTypes {
@@ -45,6 +44,7 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.okhttp)
     debugImplementation(libs.androidx.ui.tooling)
 
     testImplementation(libs.junit)
