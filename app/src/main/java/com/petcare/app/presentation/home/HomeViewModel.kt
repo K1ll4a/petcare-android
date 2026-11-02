@@ -16,6 +16,7 @@ class HomeViewModel(
     spaces: SpaceRepository,
     pets: PetRepository,
     tasks: TaskRepository,
+    initialSpaceId: Long? = null,
 ) : ViewModel() {
 
     private val controller = HomeController(viewModelScope, spaces, pets, tasks)
@@ -23,7 +24,7 @@ class HomeViewModel(
     val state: StateFlow<HomeUiState> = controller.state
 
     init {
-        controller.start()
+        controller.start(initialSpaceId)
     }
 
     fun selectSpace(spaceId: Long) = controller.selectSpace(spaceId)
@@ -40,9 +41,10 @@ class HomeViewModel(
         private val spaces: SpaceRepository,
         private val pets: PetRepository,
         private val tasks: TaskRepository,
+        private val initialSpaceId: Long? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            HomeViewModel(spaces, pets, tasks) as T
+            HomeViewModel(spaces, pets, tasks, initialSpaceId) as T
     }
 }

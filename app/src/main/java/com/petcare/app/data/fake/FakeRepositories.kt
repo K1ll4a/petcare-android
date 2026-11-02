@@ -68,6 +68,14 @@ class FakePetCareRepository(
     private var loaded: TestData? = null
     private val pets = mutableListOf<PetDto>()
     private val tasks = mutableListOf<TaskDto>()
+    private val extraSpaces = mutableMapOf<Long, Space>()
+    private val extraMembers = mutableMapOf<Long, List<Member>>()
+
+    /** Общий учебный источник аккаунтов передаёт сюда новые пространства и актуальный состав. */
+    suspend fun configureSpace(space: Space, members: List<Member>) {
+        data()
+        lock.withLock { extraSpaces[space.id] = space; extraMembers[space.id] = members }
+    }
 
     private suspend fun data(): TestData = lock.withLock {
         loaded ?: TestDataParser.parse(source.read()).shiftedTo(LocalDate.now(clock)).also {
@@ -85,7 +93,7 @@ class FakePetCareRepository(
     override suspend fun getMembers(spaceId: Long): List<Member> {
         simulate(failable = false)
         checkSpace(spaceId)
-        return data().members[spaceId].orEmpty().map { it.toDomain() }
+        return extraMembers[spaceId] ?: data().members[spaceId].orEmpty().map { it.toDomain() }
     }
 
     override suspend fun getPetTypes(): List<PetType> = data().petTypes.map { it.toDomain() }
@@ -185,7 +193,7 @@ class FakePetCareRepository(
     }
 
     private suspend fun checkSpace(spaceId: Long) {
-        if (data().spaces.none { it.spaceId == spaceId }) {
+        if (spaceId !in extraSpaces && data().spaces.none { it.spaceId == spaceId }) {
             throw ApiException(403, "forbidden", "Нет доступа к этому пространству")
         }
     }
@@ -208,7 +216,7 @@ class FakePetCareRepository(
         if (draft.petId != null && lock.withLock { pets.none { it.petId == draft.petId && it.spaceId == space.id } }) {
             errors[TaskDraft.FIELD_PET] = "Питомец не из этого пространства"
         }
-        if (draft.assigneeId != null && data().members[space.id].orEmpty().none { it.userId == draft.assigneeId }) {
+        if (draft.assigneeId != null && getConfiguredMembers(space.id).none { it.id == draft.assigneeId }) {
             errors[TaskDraft.FIELD_ASSIGNEE] = "Ответственный не из этого пространства"
         }
         if (errors.isNotEmpty()) throw ApiException(422, "validation_error", "Ошибка валидации запроса", errors)
@@ -222,7 +230,10 @@ class FakePetCareRepository(
     )
 
     private suspend fun memberNames(spaceId: Long): Map<Long, String> =
-        data().members[spaceId].orEmpty().associate { it.userId to it.name }
+        getConfiguredMembers(spaceId).associate { it.id to it.name }
+
+    private suspend fun getConfiguredMembers(spaceId: Long): List<Member> =
+        extraMembers[spaceId] ?: data().members[spaceId].orEmpty().map { it.toDomain() }
 
     private fun draftDto(
         draft: TaskDraft,

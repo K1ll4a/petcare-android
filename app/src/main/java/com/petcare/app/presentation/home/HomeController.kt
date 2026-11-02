@@ -299,6 +299,7 @@ class HomeController(
 
     private fun newGeneration(): Int {
         job?.cancel()
+        shownTasks = emptyList()
         return ++generation
     }
 

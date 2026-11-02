@@ -56,6 +56,7 @@ data class HomeNavigation(
     val onEditPet: (Pet) -> Unit,
     val onAddTask: () -> Unit,
     val onEditTask: (key: String) -> Unit,
+    val onSelectSpace: ((Long) -> Unit)? = null,
 )
 
 @Composable
@@ -63,7 +64,7 @@ fun HomeScreen(viewModel: HomeViewModel, nav: HomeNavigation) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     HomeContent(
         state = state,
-        onSelectSpace = viewModel::selectSpace,
+        onSelectSpace = nav.onSelectSpace ?: viewModel::selectSpace,
         onSelectPet = viewModel::selectPet,
         onRetry = viewModel::retry,
         onRefresh = viewModel::refresh,
@@ -238,7 +239,7 @@ private fun ProfileBlock(profile: ProfileState, onRetry: () -> Unit, onEdit: (Pe
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f),
                         )
-                        TextButton(onClick = { onEdit(pet) }) { Text("Изменить") }
+                        TextButton(onClick = { onEdit(pet) }) { Text("Профиль") }
                     }
                     ProfileLine("Аллергии", pet.allergies)
                     ProfileLine("Непереносимости", pet.intolerances)

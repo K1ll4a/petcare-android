@@ -18,7 +18,7 @@ interface HttpTransport {
     ): HttpResult
 }
 
-/** Где взять токен. Вход делает Mobile №1 (задача #13); здесь только чтение. */
+/** Чтение токена серверной сессии; HTTP-клиент сам не выполняет вход. */
 fun interface TokenProvider {
     fun token(): String?
 }

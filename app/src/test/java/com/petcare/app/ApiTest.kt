@@ -1,7 +1,6 @@
 package com.petcare.app
 
 import com.petcare.app.data.mapper.toDomain
-import com.petcare.app.data.remote.DevLoginTransport
 import com.petcare.app.data.remote.HttpResult
 import com.petcare.app.data.remote.HttpTransport
 import com.petcare.app.data.remote.PetCareApi
@@ -194,29 +193,8 @@ class ApiTest {
     }
 
     @Test
-    fun devLogin_addsTokenAndReloginsOn401() = runBlocking {
-        var token: String? = null
-        val seen = mutableListOf<String?>()
-        var logins = 0
-        val inner = object : com.petcare.app.data.remote.HttpTransport {
-            override suspend fun send(method: String, path: String, query: Map<String, String>, body: String?): HttpResult {
-                if (path == "/auth/login") {
-                    logins++
-                    return HttpResult(200, """{"token": "t$logins", "token_type": "bearer", "user": {}}""")
-                }
-                seen += token
-                // Первый токен «отозван» — сервер отвечает 401.
-                return if (token == "t1") HttpResult(401, """{"code":"unauthorized","message":"x","fields":[]}""") else HttpResult(200, "[]")
-            }
-        }
-        val t = DevLoginTransport({ provider -> object : com.petcare.app.data.remote.HttpTransport {
-            override suspend fun send(method: String, path: String, query: Map<String, String>, body: String?): HttpResult {
-                token = provider.token(); return inner.send(method, path, query, body)
-            }
-        } }, "anna@example.com", "demo-password")
-        val r = t.send("GET", "/spaces")
-        assertEquals(200, r.code)
-        assertEquals(listOf<String?>("t1", "t2"), seen)
-        assertEquals(2, logins)
+    fun unauthorized_isReported_withoutHiddenLogin() = runBlocking {
+        http.routes["GET /spaces"] = HttpResult(401, """{"code":"unauthorized","message":"Сессия истекла","fields":[]}""")
+        try { repo.getSpaces(); fail() } catch (e: ApiException) { assertTrue(e.isUnauthorized) }
     }
 }
