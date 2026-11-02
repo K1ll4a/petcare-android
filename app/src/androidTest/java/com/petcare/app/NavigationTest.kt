@@ -26,6 +26,7 @@ class NavigationTest {
     }
     private fun click(text: String) {
         waitText(text)
+        ui.waitUntil(15_000) { ui.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
         val node = ui.onNodeWithText(text)
         if (ui.onAllNodes(hasText(text) and hasAnyAncestor(hasScrollAction())).fetchSemanticsNodes().isNotEmpty()) node.performScrollTo()
         node.performClick()
