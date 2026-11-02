@@ -11,8 +11,8 @@ import com.petcare.app.domain.repository.SpaceRepository
 import com.petcare.app.domain.repository.TaskRepository
 
 /*
- * ViewModel'и форм: сохранение продолжается в viewModelScope, даже если экран
- * пересоздан (поворот), и не отменяется на полпути.
+ * ViewModel формы живёт в отдельном store открытого экрана.
+ * Закрытие формы, смена пространства или выход из аккаунта очищает store и отменяет запросы.
  */
 
 class PetEditViewModel(

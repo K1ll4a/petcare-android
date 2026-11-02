@@ -39,6 +39,7 @@ class HomeController(
     private val _state = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
+    private var requestedSpaceId: Long? = null
     private var generation = 0
     private var job: Job? = null
 
@@ -48,7 +49,8 @@ class HomeController(
     private val ready get() = _state.value as? HomeUiState.Ready
 
     /** Загрузить пространства и показать первое (или ранее выбранное). */
-    fun start(preferSpaceId: Long? = ready?.space?.id) {
+    fun start(preferSpaceId: Long? = ready?.space?.id ?: requestedSpaceId) {
+        requestedSpaceId = preferSpaceId
         val gen = newGeneration()
         _state.value = HomeUiState.Loading
         job = scope.launch {
@@ -199,6 +201,7 @@ class HomeController(
         notice: String? = null,
     ) {
         if (gen != generation) return
+        requestedSpaceId = space.id
         _state.value = HomeUiState.Ready(
             spaces = allSpaces,
             space = space,

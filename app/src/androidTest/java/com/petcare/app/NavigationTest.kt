@@ -22,12 +22,15 @@ class NavigationTest {
         }
     }
     private fun waitText(text: String) {
-        ui.waitUntil(15_000) { ui.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            ui.waitUntil(15_000) { ui.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: Throwable) { throw AssertionError("Ожидался экран: $text\n${ui.onRoot().printToString()}", e) }
     }
     private fun click(text: String) {
         waitText(text)
-        ui.waitUntil(15_000) { ui.onAllNodes(hasText(text) and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        val node = ui.onNodeWithText(text)
+        val matcher = hasText(text) and hasClickAction() and isEnabled()
+        ui.waitUntil(15_000) { ui.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        val node = ui.onNode(matcher)
         if (ui.onAllNodes(hasText(text) and hasAnyAncestor(hasScrollAction())).fetchSemanticsNodes().isNotEmpty()) node.performScrollTo()
         node.performClick()
     }

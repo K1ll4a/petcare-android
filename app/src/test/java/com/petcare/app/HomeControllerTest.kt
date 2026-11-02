@@ -356,6 +356,24 @@ class HomeControllerTest {
     }
 
     @Test
+    fun refreshDuringInitialLoad_keepsRequestedSpace() = runBlocking {
+        val response = CompletableDeferred<List<Space>>()
+        val delayedSpaces = object : SpaceRepository by repo {
+            override suspend fun getSpaces() = response.await()
+        }
+        val screen = HomeController(scope, delayedSpaces, repo, repo, clock)
+        screen.start(preferSpaceId = 2)
+        assertTrue(screen.state.value is HomeUiState.Loading)
+        screen.refresh() // ON_RESUME до ответа на список пространств.
+        response.complete(repo.spaces)
+        yield()
+        val state = screen.state.value as HomeUiState.Ready
+        assertEquals(2L, state.space.id)
+        assertTrue(repo.has("pets:2"))
+        assertFalse(repo.has("pets:1"))
+    }
+
+    @Test
     fun noSpaces_andSpacesError() = runBlocking {
         repo.spaces = emptyList()
         controller.start()

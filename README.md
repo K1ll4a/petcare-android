@@ -40,6 +40,7 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`.
 Отчёты: `app/build/reports/tests/testDebugUnitTest/index.html`, `app/build/reports/lint-results-debug.html`.
 Проверки Compose-навигации на запущенном эмуляторе/подключённом устройстве: `./gradlew :app:connectedDebugAndroidTest`.
 GitHub Actions собирает APK и сохраняет его вместе с отчётами в артефактах запуска `Android`.
+Проверено: Android 15 / API 35, AVD с профилем Pixel 7 (AOSP ATD ARM64); 99 unit-тестов и 2 UI-теста прошли.
 Фактические результаты проверки — в [docs/verification.md](docs/verification.md).
 
 ## Учебная демонстрация

@@ -83,7 +83,14 @@ private fun WorkspaceApp(container: AppContainer, account: AccountUiState, contr
     val back = { screen = Screen.Home }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, home) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) home.refresh() }
+        // Первый ON_RESUME сопровождает начальную загрузку ViewModel, повторный обновляет данные.
+        var resumed = false
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                if (resumed) home.refresh()
+                resumed = true
+            }
+        }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
