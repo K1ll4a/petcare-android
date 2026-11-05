@@ -17,11 +17,24 @@
 
 ## Проверки
 
-Первая Android-сборка после переноса прошла: `:app:assembleDebug`, 99 прежних unit-тестов,
-`:shared:compileCommonMainKotlinMetadata`. Итоговый прогон общих тестов, Lint и Android UI будет указан после завершения.
+Локальная сборка и проверки прошли на JDK 17, Gradle 8.13, AGP 8.11.1:
+
+| Проверка | Результат |
+|---|---|
+| Android APK и APK UI-тестов | Собраны |
+| Прежние JVM-тесты приложения | 99 прошли |
+| Общие Kotlin Multiplatform контракты на JVM | 9 прошли |
+| Android UI на Pixel 7 AVD, Android 15 / API 35 | 2 прошли |
+| Lint приложения и общего Android-модуля | Без ошибок |
+| Common Kotlin metadata | Компилируется |
+
+9 общих контрактов включают PBKDF2 с ASCII и Unicode паролями, системную генерацию кодов,
+часовые пояса и DST, строгую валидацию даты/времени, роли и приглашения, заголовки HTTP и обработку 401.
+Один исходный набор общих контрактов также запускается на iOS Simulator в CI.
 
 Локально полный Xcode и iOS Simulator отсутствуют: установлен только Command Line Tools.
 `project.pbxproj` и `Info.plist` проверены `plutil`. Нативная компиляция и запуск iOS проверяются отдельным GitHub Actions workflow.
+[Первый iOS-прогон](https://github.com/K1ll4a/petcare-android/actions/runs/41956324410) выполняется в CI.
 Положительный результат iOS пока не зафиксирован; наличие исходников не заменяет сборку и запуск.
 
 ## Что продолжает требовать Backend

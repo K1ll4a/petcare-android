@@ -22,8 +22,17 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Native tests and iOS app UI test
-        run: bash scripts/check-ios.sh
+        with:
+          cache-read-only: false
+      - uses: actions/cache/restore@v4
+        id: konan
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-2.2.21
+      - name: Shared Native contracts
+        run: bash scripts/check-ios.sh native
+      - name: iOS app build and UI test
+        run: bash scripts/check-ios.sh ui
       - name: Package simulator app
         run: ditto -c -k --sequesterRsrc --keepParent iosApp/build/DerivedData/Build/Products/Debug-iphonesimulator/PetCare.app iosApp/build/PetCare-simulator.zip
       - name: Upload simulator app
@@ -39,3 +48,8 @@ jobs:
           path: |
             shared/build/reports/tests/
             iosApp/build/TestResults.xcresult
+      - uses: actions/cache/save@v4
+        if: always() && steps.konan.outputs.cache-hit != 'true'
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ runner.arch }}-2.2.21

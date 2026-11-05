@@ -28,12 +28,12 @@ class PetEditViewModel(
 
     companion object {
         fun Factory(
-        repo: PetRepository,
-        spaceId: Long,
-        existing: Pet?,
-        onSaved: (Pet) -> Unit,
-        onUnconfirmed: () -> Unit,
-    ): ViewModelProvider.Factory = viewModelFactory {
+            repo: PetRepository,
+            spaceId: Long,
+            existing: Pet?,
+            onSaved: (Pet) -> Unit,
+            onUnconfirmed: () -> Unit,
+        ): ViewModelProvider.Factory = viewModelFactory {
             initializer { PetEditViewModel(repo, spaceId, existing, onSaved, onUnconfirmed) }
         }
     }
@@ -55,15 +55,15 @@ class TaskEditViewModel(
 
     companion object {
         fun Factory(
-        spaces: SpaceRepository,
-        pets: PetRepository,
-        tasks: TaskRepository,
-        space: Space,
-        existing: TaskItem?,
-        defaultPetId: Long?,
-        onSaved: (Long) -> Unit,
-        onUnconfirmed: () -> Unit,
-    ): ViewModelProvider.Factory = viewModelFactory {
+            spaces: SpaceRepository,
+            pets: PetRepository,
+            tasks: TaskRepository,
+            space: Space,
+            existing: TaskItem?,
+            defaultPetId: Long?,
+            onSaved: (Long) -> Unit,
+            onUnconfirmed: () -> Unit,
+        ): ViewModelProvider.Factory = viewModelFactory {
             initializer { TaskEditViewModel(spaces, pets, tasks, space, existing, defaultPetId, onSaved, onUnconfirmed) }
         }
     }

@@ -41,11 +41,11 @@ class HomeViewModel(
 
     companion object {
         fun Factory(
-        spaces: SpaceRepository,
-        pets: PetRepository,
-        tasks: TaskRepository,
-        initialSpaceId: Long? = null,
-    ): ViewModelProvider.Factory = viewModelFactory {
+            spaces: SpaceRepository,
+            pets: PetRepository,
+            tasks: TaskRepository,
+            initialSpaceId: Long? = null,
+        ): ViewModelProvider.Factory = viewModelFactory {
             initializer { HomeViewModel(spaces, pets, tasks, initialSpaceId) }
         }
     }

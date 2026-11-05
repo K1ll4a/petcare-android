@@ -1,21 +1,28 @@
 import XCTest
 
 final class PetCareUITests: XCTestCase {
+    private func tapWhenReady(_ element: XCUIElement, timeout: TimeInterval = 15) {
+        XCTAssertTrue(element.waitForExistence(timeout: timeout))
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: element)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: timeout), .completed)
+        element.tap()
+    }
+
     func testLoginTwoSpacesAndLogout() {
         let app = XCUIApplication()
         app.launch()
         let fill = app.buttons["Заполнить демо-аккаунт"]
         XCTAssertTrue(fill.waitForExistence(timeout: 30))
-        fill.tap()
-        app.buttons["Войти"].tap()
+        tapWhenReady(fill)
+        tapWhenReady(app.buttons["Войти"])
         let family = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Семья")).firstMatch
         XCTAssertTrue(family.waitForExistence(timeout: 15))
-        family.tap()
+        tapWhenReady(family)
         XCTAssertTrue(app.staticTexts["Tom · кот"].waitForExistence(timeout: 15))
-        app.buttons["Пространства"].tap()
+        tapWhenReady(app.buttons["Пространства"])
         let dacha = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Дача")).firstMatch
         XCTAssertTrue(dacha.waitForExistence(timeout: 15))
-        dacha.tap()
+        tapWhenReady(dacha)
         XCTAssertTrue(app.staticTexts["Мурка · кот"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["Tom · кот"].exists)
         XCTAssertFalse(app.buttons["Приглашения"].exists)

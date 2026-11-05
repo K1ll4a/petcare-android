@@ -3,7 +3,7 @@ package com.petcare.app.platform
 
 import androidx.compose.runtime.Composable
 import kotlinx.cinterop.*
-import platform.CommonCrypto.*
+import platform.CoreCrypto.*
 import platform.Security.*
 
 actual fun secureRandomBytes(size: Int): ByteArray {
