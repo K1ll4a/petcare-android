@@ -8,7 +8,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Test
-import java.io.IOException
+import kotlinx.io.IOException
 
 class AccountControllerTest {
     private suspend fun awaitIdle(controller: AccountController) {

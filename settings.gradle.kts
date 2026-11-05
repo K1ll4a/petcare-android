@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "PetCare"
-include(":app")
+include(":app", ":shared")

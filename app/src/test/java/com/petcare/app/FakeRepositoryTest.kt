@@ -1,5 +1,10 @@
 package com.petcare.app
 
+import com.petcare.app.data.fake.DemoFixture
+import kotlinx.datetime.*
+import com.petcare.app.time.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.data.fake.FakePetCareRepository
 import com.petcare.app.data.fake.FakeSaveMode
 import com.petcare.app.data.fake.FakeScenario
@@ -16,25 +21,18 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import java.io.File
-import java.io.IOException
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.ZoneOffset
+import kotlinx.io.IOException
 
 class FakeRepositoryTest {
 
     /** Тесты запускаются из папки модуля app/. */
-    private val json = RawJsonSource { File("src/main/assets/test_data.json").readText() }
+    private val json = RawJsonSource { DemoFixture.json }
 
     private fun repo(today: String = "2026-10-22", scenario: FakeScenario = FakeScenario.NORMAL) =
         FakePetCareRepository(
             source = json,
             scenario = scenario,
-            clock = Clock.fixed(Instant.parse("${today}T09:00:00Z"), ZoneOffset.UTC),
+            clock = fixedClock(Instant.parse("${today}T09:00:00Z"), kotlinx.datetime.TimeZone.UTC),
             baseDelayMs = 0,
         )
 
@@ -86,10 +84,10 @@ class FakeRepositoryTest {
     fun dates_areShiftedToToday() = runBlocking {
         val items = repo(today = "2026-11-05").getTaskItems(1, 10)
         val feed = items.first { it.task.id == 1L && it.status == TaskStatus.DONE }
-        assertEquals(LocalDate.of(2026, 11, 5), feed.occurrenceDate)
-        val local = feed.dueAt.atZone(ZoneId.of("Europe/Moscow"))
-        assertEquals(LocalDate.of(2026, 11, 5), local.toLocalDate())
-        assertEquals("08:00", local.toLocalTime().toString())
+        assertEquals(LocalDate(2026, 11, 5), feed.occurrenceDate)
+        val local = feed.dueAt.toLocalDateTime(TimeZone.of("Europe/Moscow"))
+        assertEquals(LocalDate(2026, 11, 5), local.date)
+        assertEquals("08:00", local.time.toString())
         assertEquals("1:2026-11-05", feed.key)
     }
 
@@ -158,13 +156,13 @@ class FakeRepositoryTest {
     fun createTask_thenUpdate_inSpaceZone() = runBlocking {
         val r = repo()
         val dacha = r.getSpaces().first { it.id == 2L }
-        val id = r.createTask(dacha, TaskDraft(21, "погулять", 3, RepeatType.ONCE, LocalDate.of(2026, 10, 23), LocalTime.of(10, 0)))
+        val id = r.createTask(dacha, TaskDraft(21, "погулять", 3, RepeatType.ONCE, LocalDate(2026, 10, 23), LocalTime(10, 0)))
         val created = r.getTaskItems(2, 21).single { it.task.id == id }
         // 10:00 Екатеринбург (UTC+5) = 05:00 UTC
         assertEquals(Instant.parse("2026-10-23T05:00:00Z"), created.dueAt)
         assertEquals("Гриша", created.task.assigneeName)
 
-        r.updateTask(dacha, id, TaskDraft(21, "погулять подольше", 5, RepeatType.ONCE, LocalDate.of(2026, 10, 23), LocalTime.of(11, 0)))
+        r.updateTask(dacha, id, TaskDraft(21, "погулять подольше", 5, RepeatType.ONCE, LocalDate(2026, 10, 23), LocalTime(11, 0)))
         val updated = r.getTaskItems(2, 21).filter { it.task.id == id }
         assertEquals(1, updated.size)
         assertEquals("погулять подольше", updated.single().task.title)
@@ -177,7 +175,7 @@ class FakeRepositoryTest {
         val family = r.getSpaces().first { it.id == 1L }
         try {
             // Олег (5) — участник только «Дачи».
-            r.createTask(family, TaskDraft(10, "x", 5, RepeatType.ONCE, LocalDate.of(2026, 10, 23), LocalTime.NOON))
+            r.createTask(family, TaskDraft(10, "x", 5, RepeatType.ONCE, LocalDate(2026, 10, 23), LocalTime(12, 0)))
             fail()
         } catch (e: ApiException) {
             assertTrue(TaskDraft.FIELD_ASSIGNEE in e.fields)

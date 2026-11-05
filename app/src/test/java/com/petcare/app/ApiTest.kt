@@ -1,5 +1,9 @@
 package com.petcare.app
 
+import kotlinx.datetime.*
+import com.petcare.app.time.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.data.mapper.toDomain
 import com.petcare.app.data.remote.HttpResult
 import com.petcare.app.data.remote.HttpTransport
@@ -19,9 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import java.io.IOException
-import java.time.LocalDate
-import java.time.LocalTime
+import kotlinx.io.IOException
 
 /** Подставной HTTP: записывает запросы и отвечает заготовками по "МЕТОД путь". */
 class RecordingTransport : HttpTransport {
@@ -122,7 +124,7 @@ class ApiTest {
     @Test
     fun createTask_postsToSpace_withTimeInSpaceZone() = runBlocking {
         http.routes["POST /spaces/5/tasks"] = HttpResult(201, taskJson(42, 9, 5))
-        val id = repo.createTask(moscow, TaskDraft(9, "прогулка", 4, RepeatType.ONCE, LocalDate.of(2026, 10, 22), LocalTime.of(20, 0)))
+        val id = repo.createTask(moscow, TaskDraft(9, "прогулка", 4, RepeatType.ONCE, LocalDate(2026, 10, 22), LocalTime(20, 0)))
         assertEquals(42L, id)
         val body = JsonCodec.parse(http.calls.single { it.method == "POST" }.body!!).jsonObject
         assertEquals("1792688400", body["date_time"]!!.jsonPrimitive.content) // 20:00 МСК
@@ -133,7 +135,7 @@ class ApiTest {
     fun createTask_withInvalidTimezone_isNotSent() = runBlocking {
         val broken = SpaceDto(5, "Семья", "Mars/Olympus").toDomain()
         try {
-            repo.createTask(broken, TaskDraft(9, "x", 4, RepeatType.ONCE, LocalDate.of(2026, 10, 22), LocalTime.NOON))
+            repo.createTask(broken, TaskDraft(9, "x", 4, RepeatType.ONCE, LocalDate(2026, 10, 22), LocalTime(12, 0)))
             fail("ожидался отказ")
         } catch (e: InvalidServerDataException) {
             assertTrue(http.calls.none { it.method == "POST" })

@@ -1,5 +1,8 @@
 # Передача общего проекта Mobile №2
 
+> Описание состояния Android до миграции. Актуальная структура Android/iOS и результаты перехода — в [multiplatform.md](multiplatform.md) и корневом README.
+
+
 ## Что уже объединено
 
 Основа — `origin/feature/connect-pets-tasks` (`7704bf3`), продолжение её истории в `feature/shared-auth-spaces`.

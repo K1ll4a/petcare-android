@@ -1,5 +1,9 @@
 package com.petcare.app
 
+import kotlinx.datetime.*
+import com.petcare.app.time.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.data.mapper.toDomain
 import com.petcare.app.data.remote.dto.SpaceDto
 import com.petcare.app.domain.model.Member
@@ -34,10 +38,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.IOException
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
+import kotlinx.io.IOException
 
 /**
  * Репозиторий, ответы которого тест отдаёт вручную, в любом порядке, — так детерминированно
@@ -95,7 +96,7 @@ class HomeControllerTest {
     // Unconfined: корутины идут сразу до первой приостановки — порядок задаёт тест.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val repo = ControlledRepo()
-    private val clock = Clock.fixed(Instant.parse("2026-10-22T09:00:00Z"), ZoneOffset.UTC)
+    private val clock = fixedClock(Instant.parse("2026-10-22T09:00:00Z"), kotlinx.datetime.TimeZone.UTC)
     private val controller = HomeController(scope, repo, repo, repo, clock)
 
     private val ready get() = controller.state.value as HomeUiState.Ready

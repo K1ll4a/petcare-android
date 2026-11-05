@@ -1,0 +1,41 @@
+name: iOS
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Native tests and iOS app UI test
+        run: bash scripts/check-ios.sh
+      - name: Package simulator app
+        run: ditto -c -k --sequesterRsrc --keepParent iosApp/build/DerivedData/Build/Products/Debug-iphonesimulator/PetCare.app iosApp/build/PetCare-simulator.zip
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: petcare-ios-simulator
+          path: iosApp/build/PetCare-simulator.zip
+      - name: Upload iOS reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-reports
+          path: |
+            shared/build/reports/tests/
+            iosApp/build/TestResults.xcresult

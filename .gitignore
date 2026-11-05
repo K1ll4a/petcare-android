@@ -10,3 +10,12 @@
 .cxx/
 
 /.kotlin/
+
+# Multiplatform and Xcode local outputs
+/shared/build/
+/iosApp/build/
+/iosApp/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+/iosApp/Config/Signing.xcconfig

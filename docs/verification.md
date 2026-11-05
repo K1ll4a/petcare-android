@@ -1,5 +1,8 @@
 # Проверка общего Android-проекта
 
+> Описание состояния Android до миграции. Актуальная структура Android/iOS и результаты перехода — в [multiplatform.md](multiplatform.md) и корневом README.
+
+
 Дата: 02.11.2026 (Europe/Moscow). Ветка: `feature/shared-auth-spaces`.
 Среда сборки: macOS ARM64, OpenJDK 17.0.13, Gradle Wrapper 8.11.1, AGP 8.7.3,
 SDK Platform 35, Build-Tools 34.0.0. SDK для проверки установлен во временную папку `/private/tmp/petcare-android-sdk`.

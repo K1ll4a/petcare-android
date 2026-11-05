@@ -1,5 +1,9 @@
 package com.petcare.app
 
+import kotlinx.datetime.*
+import com.petcare.app.time.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.domain.model.RepeatType
 import com.petcare.app.domain.model.Task
 import com.petcare.app.domain.model.TaskItem
@@ -11,15 +15,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.util.TimeZone
+import java.util.TimeZone as JvmTimeZone
 
 class TaskPresentationTest {
 
-    private val moscow = ZoneId.of("Europe/Moscow")
-    private val today = LocalDate.of(2026, 10, 22)
+    private val moscow = TimeZone.of("Europe/Moscow")
+    private val today = LocalDate(2026, 10, 22)
 
     private fun item(id: Long, status: TaskStatus, due: String, daily: Boolean = false) = TaskItem(
         task = Task(id, 10, "задача $id", if (daily) RepeatType.DAILY else RepeatType.ONCE, 3, "Гриша"),
@@ -45,14 +46,14 @@ class TaskPresentationTest {
 
     @Test
     fun time_isShownInSpaceZone_notDeviceZone() {
-        val saved = TimeZone.getDefault()
+        val saved = JvmTimeZone.getDefault()
         try {
-            TimeZone.setDefault(TimeZone.getTimeZone("Asia/Tokyo")) // «устройство» в Токио
+            JvmTimeZone.setDefault(JvmTimeZone.getTimeZone("Asia/Tokyo")) // «устройство» в Токио
             val f = SpaceTimeFormatter(moscow, today)
             // 17:00 UTC = 20:00 МСК (в Токио было бы 02:00 следующего дня)
             assertEquals("сегодня, 20:00", f.format(Instant.parse("2026-10-22T17:00:00Z")))
         } finally {
-            TimeZone.setDefault(saved)
+            JvmTimeZone.setDefault(saved)
         }
     }
 

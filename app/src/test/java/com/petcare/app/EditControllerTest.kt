@@ -1,5 +1,9 @@
 package com.petcare.app
 
+import kotlinx.datetime.*
+import com.petcare.app.time.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.domain.model.Member
 import com.petcare.app.domain.model.Pet
 import com.petcare.app.domain.model.PetDraft
@@ -28,12 +32,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.IOException
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneOffset
+import kotlinx.io.IOException
 
 /** Сохранение отвечает только тогда, когда тест скажет. */
 private class SaveRepo : SpaceRepository, PetRepository, TaskRepository {
@@ -64,7 +63,7 @@ private class SaveRepo : SpaceRepository, PetRepository, TaskRepository {
 class EditControllerTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val repo = SaveRepo()
-    private val clock = Clock.fixed(Instant.parse("2026-10-22T09:00:00Z"), ZoneOffset.UTC)
+    private val clock = fixedClock(Instant.parse("2026-10-22T09:00:00Z"), kotlinx.datetime.TimeZone.UTC)
     private var saved = 0
     private var unconfirmed = 0
 
@@ -170,8 +169,8 @@ class EditControllerTest {
         c.edit { it.copy(title = "прогулка", assigneeId = 4, repeat = RepeatType.DAILY, timeText = "20:00") }
         c.save()
         assertEquals(SaveState.Saving, c.state.value.save)
-        assertEquals(LocalTime.of(20, 0), repo.lastTask!!.time)
-        assertEquals(LocalDate.of(2026, 10, 22), repo.lastTask!!.date)
+        assertEquals(LocalTime(20, 0), repo.lastTask!!.time)
+        assertEquals(LocalDate(2026, 10, 22), repo.lastTask!!.date)
         assertEquals(1L, repo.lastTaskSpace!!.id)
 
         repo.taskSave.complete(42)

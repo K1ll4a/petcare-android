@@ -1,113 +1,119 @@
-# PetCare — общий Android-проект
+# PetCare для Android и iOS
 
-Учебный проект Mobile №1 и Mobile №2. Один модуль `app`, одна `MainActivity`, один Gradle Wrapper.
-Каркас основан на работе Mobile №2 из `feature/connect-pets-tasks`: модели, мапперы, тесты, главный экран и формы сохранены.
+Общий учебный проект Mobile №1 и Mobile №2 на **Kotlin Multiplatform + Compose Multiplatform**.
+Одинаковые экраны, навигация, модели и логика работают из модуля `shared`; Android и iOS имеют собственные точки запуска.
 
-Общий репозиторий: [K1ll4a/petcare-android](https://github.com/K1ll4a/petcare-android).
-Ветка с общим приложением: `feature/shared-auth-spaces`.
+Репозиторий: [K1ll4a/petcare-android](https://github.com/K1ll4a/petcare-android).
+Переход на две платформы: ветка `feature/android-ios`.
 
-## Быстрый запуск
+## Структура
+
+```text
+app/                           Android-приложение и его инструментальные тесты
+shared/
+  src/commonMain/kotlin/       общие экраны, контроллеры, модели, JSON, репозитории и HTTP
+  src/androidMain/kotlin/      SharedPreferences, Android Back, Java crypto, HTTP OkHttp engine
+  src/iosMain/kotlin/          NSUserDefaults, CommonCrypto/Security, HTTP Darwin engine, UIViewController
+  src/commonTest/kotlin/       одни и те же контракты для Android и iOS
+  build.gradle.kts            Android, iPhone ARM64, Apple Silicon и Intel симуляторы
+iosApp/
+  PetCare.xcodeproj/           готовый Xcode-проект со схемой PetCare
+  Sources/                    SwiftUI-оболочка и Info.plist
+  UITests/                    проверка входа, двух пространств и выхода на iOS
+scripts/check-ios.sh           сборка iOS и тесты на доступном iPhone-симуляторе
+```
+
+Стек: Kotlin 2.2.21, Compose Multiplatform 1.8.2, Lifecycle 2.9.0, Ktor 3.1.3, kotlinx-datetime 0.6.2.
+Java/Android API используются только в `androidMain` и Android-приложении.
+Общий код не зависит от `java.time`, Android Context или Android Activity.
+Android: **8.0 / API 26+**, compile/target SDK 35. iOS: **15.0+**, iPhone и iPad.
+
+## Запуск Android
 
 1. Клонировать репозиторий и выбрать ветку:
    ```sh
    git clone https://github.com/K1ll4a/petcare-android.git
    cd petcare-android
-   git switch feature/shared-auth-spaces
+   git switch feature/android-ios
    ```
-2. В Android Studio Ladybug или новее выбрать **Open** → корневую папку `petcare-android` с `settings.gradle.kts`.
-3. Использовать **JDK 17** для Gradle. Через SDK Manager установить **Android SDK Platform 35**, **Build-Tools 34.0.0**, **Platform-Tools**.
-4. Через Device Manager создать эмулятор **Pixel 7 / Android 15 (API 35)**; для Apple Silicon выбрать ARM64, для Intel/AMD — x86_64.
-5. Дождаться Gradle Sync, выбрать конфигурацию **app**, нажать **Run**. Сервер и ключи не нужны.
+2. Открыть **корневую папку** с `settings.gradle.kts` в Android Studio Narwhal 2025.1.1 или новее. Gradle JDK — **17**.
+3. Установить Android SDK Platform 35, Build-Tools 35.0.0 и Platform-Tools.
+4. Запустить конфигурацию **app** на телефоне или эмуляторе Android API 26+.
 
-Минимум: Android 8.0 / API 26. `compileSdk` и `targetSdk`: 35. Kotlin 2.0.21, Compose, Material 3, Coroutines/StateFlow, ручной DI.
-Версии сохранены от исходного проекта, чтобы оба разработчика работали с одинаковыми зависимостями.
-
-Для запуска из терминала нужны JDK 17 и Android SDK. Указать путь в локальном, исключённом из Git `local.properties`:
-
-```properties
-sdk.dir=/absolute/path/to/Android/sdk
-```
-
-Либо установить переменную `ANDROID_HOME`, затем:
+Для терминала указать `ANDROID_HOME` или создать исключённый из Git `local.properties` с `sdk.dir=/absolute/path/to/sdk`:
 
 ```sh
-./gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:assembleDebug :app:testDebugUnitTest :shared:testDebugUnitTest
+./gradlew :app:lintDebug :shared:lintDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.petcare.app/.MainActivity
 ```
 
+При подключённом эмуляторе/устройстве: `./gradlew :app:connectedDebugAndroidTest`.
 APK: `app/build/outputs/apk/debug/app-debug.apk`.
-Отчёты: `app/build/reports/tests/testDebugUnitTest/index.html`, `app/build/reports/lint-results-debug.html`.
-Проверки Compose-навигации на запущенном эмуляторе/подключённом устройстве: `./gradlew :app:connectedDebugAndroidTest`.
-GitHub Actions собирает APK и сохраняет его вместе с отчётами в артефактах запуска `Android`.
-Проверено: Android 15 / API 35, AVD с профилем Pixel 7 (AOSP ATD ARM64); 99 unit-тестов и 2 UI-теста прошли.
-Фактические результаты проверки — в [docs/verification.md](docs/verification.md).
 
-## Учебная демонстрация
+## Запуск iOS
 
-Приложение явно работает с локальным учебным сервером, без HTTP. Для всех демо-аккаунтов пароль **`demo12345`**:
+Нужен Mac с **полным Xcode** и установленным iOS Simulator. Одних Command Line Tools недостаточно.
+Рекомендуется Xcode 16.4 или 26.0, JDK 17; Gradle Wrapper включён в репозиторий.
 
-| Email | Роль и пространства |
-|---|---|
-| `grisha@example.com` | владелец «Семьи», участник «Дачи» |
-| `anna@example.com` | участник «Семьи» |
-| `oleg@example.com` | владелец «Дачи» |
+1. Открыть Xcode, завершить установку компонентов и установить iOS Simulator через Settings → Components.
+2. Открыть **`iosApp/PetCare.xcodeproj`**, выбрать схему **PetCare** и доступный iPhone-симулятор.
+3. Нажать **Run**. Build Phase автоматически вызовет `:shared:embedAndSignAppleFrameworkForXcode`.
+   Общий Kotlin-модуль собирается в `PetCareShared.framework`; SwiftUI отображает его `MainViewController`.
+4. Apple Developer Team для симулятора не требуется. Для физического iPhone выбрать свой Team в Signing & Capabilities
+   и при необходимости уникальный Bundle Identifier.
 
-На экране входа есть кнопка **«Заполнить демо-аккаунт»**. Она заполняет поля Гриши; затем нажать **«Войти»**.
+Для проверки из терминала:
 
-1. Войти → выбрать «Семью» → открыть **«Профиль»** у Tom → **«К задачам»** → **«+ Задача»** → вернуться назад.
-2. **«Пространства»** → «Дача»: у неё другие питомцы и задачи, старые данные сразу убираются.
-3. **«Пространства»** → **«Создать пространство»** → название и IANA-пояс, например `Europe/Moscow`. Создатель становится владельцем.
-4. В «Семье» открыть **«Приглашения»** → создать код. Выделить и скопировать код. Можно создать несколько отдельных кодов.
-5. Выйти с подтверждением → зарегистрировать новый аккаунт → **«Присоединиться по коду»**. Использованный код больше не работает; роль нового участника — «Участник».
-6. Снова войти владельцем → создать другой код → **«Отозвать»**. При попытке присоединиться по нему показывается ошибка. Срок кодов — 24 часа, граница срока проверена автоматическим тестом.
-7. Выйти из профиля/формы/главной → нажать системную кнопку «Назад»: защищённые экраны не возвращаются. Повторный вход открывает список пространств.
-
-Для ошибок загрузки или задержек поменять `DevConfig.FAKE_SCENARIO` в `AppContainer.kt` на `ERROR` или `SLOW`.
-Для ошибок сохранения — `DevConfig.FAKE_SAVE_MODE`: `SERVER_ERROR` / `NO_RESPONSE`.
-После изменения конфигурации перезапустить приложение.
-
-Аккаунты, хеши паролей, членство и приглашения сохраняются в закрытых настройках приложения. Активная сессия, выбор пространства,
-пароль формы и состояния защищённых экранов не сохраняются. При выходе их состояние и ViewModel очищаются, запросы отменяются;
-ответ предыдущей сессии не применяется. Настройки учебного сервера остаются, как данные на настоящем backend.
-После завершения процесса нужен повторный вход.
-
-Питомцы и задачи учебного сервера хранятся в памяти процесса: их изменения переживают выход из аккаунта, но после полного
-перезапуска возвращаются к тестовым данным. Ежедневное расписание здесь — демонстрационные экземпляры, без фонового генератора.
-Приглашения и аккаунты доступны **только на одном устройстве**, между телефонами данные не передаются.
-Сброс всей демонстрации: настройки Android → приложения → PetCare → очистить хранилище.
-
-## Структура и разделение работы
-
-```text
-app/src/main/java/com/petcare/app/
-├── domain/model          модели аккаунта, пространства, питомца и задачи
-├── domain/repository     интерфейсы данных и AccountRepository
-├── data/fake             учебные аккаунты, приглашения и тестовые питомцы/задачи
-├── data/remote           сохранённый HTTP-клиент и DTO Mobile №2
-├── data/repository       ApiPetCareRepository для последующего подключения API
-├── presentation/account вход, регистрация, пространства, приглашения
-├── presentation/home    единственный главный экран Mobile №2
-├── presentation/edit    формы питомца и задачи Mobile №2
-├── ui/theme              общая тема Compose
-├── AppContainer.kt       точка подключения зависимостей
-├── PetCareApplication.kt контейнер на процесс приложения
-└── MainActivity.kt       общая навигация и граница защищённого раздела
+```sh
+bash scripts/check-ios.sh
 ```
 
-Mobile №1: `presentation/account`, общая навигация, сессия. Mobile №2: `presentation/home`, `presentation/edit`, питомцы и задачи.
-Общие модели и интерфейсы меняются в этом репозитории. Второй проект, дополнительные архивы и вложенная `.git` не нужны.
-Открытие формы создаёт отдельный ViewModelStore; выход с неё отменяет её запросы. Поворот экрана возвращает к главной,
-несохранённая форма не восстанавливается. При неопределённом результате сохранения нужно перечитать список.
+Скрипт выбирает доступный iPhone-симулятор, запускает общие Native-тесты для архитектуры компьютера,
+затем собирает iOS-приложение и выполняет XCTest сценарий входа, переключения пространств и выхода.
+Результаты: `iosApp/build/TestResults.xcresult`, приложение симулятора — в `iosApp/build/DerivedData/Build/Products/Debug-iphonesimulator/PetCare.app`.
+Этот `.app` предназначен для симулятора; установка на физическое устройство требует подписи Apple.
 
-## Подключение настоящего Backend
+## Учебная демонстрация на обеих платформах
 
-Экранный слой зависит от `AccountRepository`, а данные питомцев/задач — от интерфейсов Mobile №2.
-`PetCareApi`, `OkHttpTransport`, DTO и `ApiPetCareRepository` сохранены. Скрытый автоматический вход тестовым пользователем удалён.
+Сервер для демонстрации не нужен. Для демо-аккаунтов пароль **`demo12345`**:
 
-Следующий шаг: реализовать серверный `AccountRepository` по фактическому контракту и собрать зависимости в `AppContainer`.
-Токен хранить отдельно от экранного состояния, передавать через `TokenProvider`; при 401 очищать сессию и защищённое состояние,
-при выходе удалять токен даже при сетевой ошибке. Пути регистрации, выхода и приглашений пока не выдуманы и не отправляются в сеть.
-Проверки на реальном API и между двумя устройствами ещё не выполнены. Список для интеграции — [docs/handoff.md](docs/handoff.md).
+| Email | Пространства |
+|---|---|
+| `grisha@example.com` | «Семья»: владелец, «Дача»: участник |
+| `anna@example.com` | «Семья»: участник |
+| `oleg@example.com` | «Дача»: владелец |
 
-Удаление участников и передача владения в эти две задачи не входят.
+Нажать **«Заполнить демо-аккаунт»**, затем **«Войти»**.
+Проверить «Семью» → профиль Tom → форму задачи → «Пространства» → «Дачу»: питомцы и задачи меняются.
+Новый аккаунт создаётся без пространств. Можно создать своё пространство или присоединиться по коду другого аккаунта.
+Владелец управляет отдельными одноразовыми кодами на 24 часа; участнику управление приглашениями недоступно.
+Выход с подтверждением очищает защищённый раздел и отменяет его запросы. Повторный вход открывает список пространств.
+
+**Ограничения учебного режима:** аккаунты, членство и приглашения сохраняются локально на конкретном устройстве.
+Синхронизация Android ↔ iOS появится после подключения Backend. Для проверки приглашения переключайтесь между
+аккаунтами на одном устройстве. Питомцы и задачи сохраняются в памяти процесса и после завершения процесса
+восстанавливаются из общей JSON-фикстуры `shared/.../data/fake/DemoFixture.kt`.
+Активная сессия и пароль формы не сохраняются. Формы при закрытии/пересоздании экрана не восстанавливаются.
+На iOS возврат выполняется видимыми кнопками «Назад», «К задачам», «Пространства».
+
+Настройки ошибок: `DevConfig` в `shared/src/commonMain/kotlin/com/petcare/app/AppContainer.kt`.
+`FAKE_SCENARIO`: NORMAL / EMPTY / ERROR / SLOW; `FAKE_SAVE_MODE`: OK / SERVER_ERROR / NO_RESPONSE.
+Для полного сброса Android очистить хранилище приложения; на iOS удалить приложение и установить заново.
+
+## Подключение Backend и работа команды
+
+`AccountRepository`, `SpaceRepository`, `PetRepository` и `TaskRepository` общие.
+Согласованная серверная реализация подключается в общем `AppContainer` сразу для двух платформ.
+`KtorHttpTransport` использует OkHttp на Android и Darwin/NSURLSession на iOS; bearer-токен передаётся через `TokenProvider`.
+Токен настоящего аккаунта потребуется хранить в платформенном защищённом хранилище; учебный режим токен не создаёт.
+Автоматический вход тестовым пользователем отсутствует. Форматы `PetCareApi`, DTO и допущения `TaskEndpoints` сохранены.
+
+Экраны и их логику изменять в **`shared/src/commonMain`**, а не создавать вторую копию для iOS.
+Мобильные разработчики работают в этом репозитории; при смене интерфейса проверяют обе платформы.
+Настоящая авторизация, межустройственная синхронизация, удаление участника и передача владения ещё не реализованы.
+
+Проверки и ограничения миграции: [docs/multiplatform.md](docs/multiplatform.md).
+Историческая проверка Android до миграции: [docs/verification.md](docs/verification.md).
+GitHub Actions: **Android** собирает APK и тесты; **iOS** собирает приложение симулятора и выполняет Native/XCTest проверки.

@@ -1,5 +1,9 @@
 package com.petcare.app
 
+import kotlinx.datetime.*
+import com.petcare.app.time.*
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.data.mapper.toDomain
 import com.petcare.app.data.mapper.toDraft
 import com.petcare.app.data.mapper.toRequestBody
@@ -20,10 +24,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
 
 class MapperTest {
 
@@ -68,7 +68,7 @@ class MapperTest {
         assertEquals("1", once.key)
 
         val daily = backendTask.copy(occurrenceDate = "2026-10-22").toDomain()
-        assertEquals(LocalDate.of(2026, 10, 22), daily.occurrenceDate)
+        assertEquals(LocalDate(2026, 10, 22), daily.occurrenceDate)
         assertEquals("1_2026-10-22", daily.key)
     }
 
@@ -83,7 +83,7 @@ class MapperTest {
             status = "done", completedById = 3, completedByName = "Гриша", completedAt = 1792645800,
         ).toDomain()
         assertEquals("Гриша", item.completedByName)
-        assertEquals(Instant.ofEpochSecond(1792645800), item.completedAt)
+        assertEquals(Instant.fromEpochSeconds(1792645800), item.completedAt)
     }
 
     @Test
@@ -186,12 +186,12 @@ class MapperTest {
 
     @Test
     fun taskBody_timeIsInSpaceZone_notDeviceZone() {
-        val draft = TaskDraft(9, "прогулка", 4, RepeatType.DAILY, LocalDate.of(2026, 10, 22), LocalTime.of(20, 0))
-        val moscow = JsonCodec.parse(draft.toRequestBody(ZoneId.of("Europe/Moscow"))).jsonObject
-        val yekat = JsonCodec.parse(draft.toRequestBody(ZoneId.of("Asia/Yekaterinburg"))).jsonObject
+        val draft = TaskDraft(9, "прогулка", 4, RepeatType.DAILY, LocalDate(2026, 10, 22), LocalTime(20, 0))
+        val moscow = JsonCodec.parse(draft.toRequestBody(TimeZone.of("Europe/Moscow"))).jsonObject
+        val yekat = JsonCodec.parse(draft.toRequestBody(TimeZone.of("Asia/Yekaterinburg"))).jsonObject
         // 20:00 МСК = 17:00 UTC; 20:00 Екатеринбург = 15:00 UTC.
-        assertEquals(Instant.parse("2026-10-22T17:00:00Z").epochSecond, moscow["date_time"]!!.jsonPrimitive.content.toLong())
-        assertEquals(Instant.parse("2026-10-22T15:00:00Z").epochSecond, yekat["date_time"]!!.jsonPrimitive.content.toLong())
+        assertEquals(Instant.parse("2026-10-22T17:00:00Z").epochSeconds, moscow["date_time"]!!.jsonPrimitive.content.toLong())
+        assertEquals(Instant.parse("2026-10-22T15:00:00Z").epochSeconds, yekat["date_time"]!!.jsonPrimitive.content.toLong())
         assertEquals("2026-10-22", moscow["start_date"]!!.jsonPrimitive.content)
         assertEquals("20:00", moscow["local_time"]!!.jsonPrimitive.content)
     }
@@ -199,9 +199,9 @@ class MapperTest {
     @Test
     fun taskItem_toDraft_usesSpaceZone() {
         val item = JsonCodec.task(JsonCodec.obj(serverItem)).toDomain() // 1792688400 = 22.10 17:00 UTC
-        val d = item.toDraft(ZoneId.of("Europe/Moscow"))
-        assertEquals(LocalTime.of(20, 0), d.time)
-        assertEquals(LocalDate.of(2026, 10, 22), d.date)
+        val d = item.toDraft(TimeZone.of("Europe/Moscow"))
+        assertEquals(LocalTime(20, 0), d.time)
+        assertEquals(LocalDate(2026, 10, 22), d.date)
         assertEquals(4L, d.assigneeId)
     }
 }
