@@ -6,6 +6,11 @@
 Репозиторий: [K1ll4a/petcare-android](https://github.com/K1ll4a/petcare-android).
 Переход на две платформы: ветка `feature/android-ios`.
 
+Статус проверки: Android собирается, JVM- и Android UI-тесты прошли. Общие Native-тесты
+и сборка iOS-приложения прошли в CI; проверка iOS-интерфейса после исправления запуска
+ожидает разблокировки GitHub Actions из-за проблемы с оплатой аккаунта.
+Подробности и ссылки на прогоны — в [отчёте миграции](docs/multiplatform.md).
+
 ## Структура
 
 ```text

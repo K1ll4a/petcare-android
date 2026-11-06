@@ -27,6 +27,9 @@
 | Android UI на Pixel 7 AVD, Android 15 / API 35 | 2 прошли |
 | Lint приложения и общего Android-модуля | Без ошибок |
 | Common Kotlin metadata | Компилируется |
+| Общие Native-тесты на iPhone 16 Pro Simulator, iOS 18.5 / ARM64, Xcode 16.4 | Прошли в CI |
+| iOS-приложение и XCTest runner | Собраны в CI до исправления Info.plist |
+| iOS UI после исправления запуска | Ожидает запуска CI, см. ниже |
 
 9 общих контрактов включают PBKDF2 с ASCII и Unicode паролями, системную генерацию кодов,
 часовые пояса и DST, строгую валидацию даты/времени, роли и приглашения, заголовки HTTP и обработку 401.
@@ -39,9 +42,21 @@
 [Повторная iOS-проверка](https://github.com/K1ll4a/petcare-android/actions/runs/41957934865) запускает
 сначала общие Native-контракты, затем отдельно сборку приложения и XCTest на iPhone-симуляторе.
 Общие Native-контракты прошли, приложение и XCTest runner собраны. UI-прогон завершился
-после запуска приложения: в Info.plist отсутствовал обязательный для Compose параметр
-`CADisableMinimumFrameDurationOnPhone`. Он добавлен вместе с SwiftUI Scene Manifest;
-Debug собирает только активную архитектуру симулятора. Итоговый UI-прогон повторяется.
+после запуска приложения. В Info.plist найден пропущенный обязательный для Compose параметр
+`CADisableMinimumFrameDurationOnPhone`; [документация Compose](https://kotlinlang.org/docs/multiplatform/whats-new-compose-170.html#disabling-minimum-frame-duration-on-ios-is-mandatory)
+указывает, что его отсутствие приводит к завершению приложения.
+Он добавлен вместе с SwiftUI Scene Manifest; Debug собирает только активную архитектуру симулятора.
+
+6 ноября локально повторно прошли сборка Android, JVM-тесты и lint.
+[Повторный iOS-прогон после исправления](https://github.com/K1ll4a/petcare-android/actions/runs/42257961985)
+и [Android-прогон](https://github.com/K1ll4a/petcare-android/actions/runs/42257961719)
+не запустили ни одного шага: GitHub вернул `The job was not started because your account is locked due to a billing issue.`
+Это ограничение аккаунта GitHub. Предыдущая [Android-проверка](https://github.com/K1ll4a/petcare-android/actions/runs/41957934906)
+завершилась успешно.
+
+Для завершения iOS-проверки после снятия ограничения повторить workflow **iOS** на ветке `feature/android-ios`
+через Actions → iOS → Run workflow. Альтернатива на Mac с полным Xcode: `bash scripts/check-ios.sh`.
+До успешного XCTest-прогона вход, переключение пространств и выход на iOS не считаются подтверждёнными.
 
 ## Что продолжает требовать Backend
 
