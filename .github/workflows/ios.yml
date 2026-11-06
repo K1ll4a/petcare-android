@@ -48,6 +48,7 @@ jobs:
           path: |
             shared/build/reports/tests/
             iosApp/build/TestResults.xcresult
+            iosApp/build/diagnostics/
       - uses: actions/cache/save@v4
         if: always() && steps.konan.outputs.cache-hit != 'true'
         with:

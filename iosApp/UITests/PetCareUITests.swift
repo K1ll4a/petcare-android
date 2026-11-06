@@ -1,6 +1,10 @@
 import XCTest
 
 final class PetCareUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+    }
+
     private func tapWhenReady(_ element: XCUIElement, timeout: TimeInterval = 15) {
         XCTAssertTrue(element.waitForExistence(timeout: timeout))
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: element)

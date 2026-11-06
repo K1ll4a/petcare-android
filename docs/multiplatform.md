@@ -34,8 +34,14 @@
 
 Локально полный Xcode и iOS Simulator отсутствуют: установлен только Command Line Tools.
 `project.pbxproj` и `Info.plist` проверены `plutil`. Нативная компиляция и запуск iOS проверяются отдельным GitHub Actions workflow.
-[Первый iOS-прогон](https://github.com/K1ll4a/petcare-android/actions/runs/41956324410) выполняется в CI.
-Положительный результат iOS пока не зафиксирован; наличие исходников не заменяет сборку и запуск.
+Первый iOS-прогон обнаружил неверное имя импорта системной CommonCrypto в Kotlin/Native.
+Импорт исправлен по определению `CommonCrypto.def` Kotlin 2.2.21: пакет `platform.CoreCrypto`.
+[Повторная iOS-проверка](https://github.com/K1ll4a/petcare-android/actions/runs/41957934865) запускает
+сначала общие Native-контракты, затем отдельно сборку приложения и XCTest на iPhone-симуляторе.
+Общие Native-контракты прошли, приложение и XCTest runner собраны. UI-прогон завершился
+после запуска приложения: в Info.plist отсутствовал обязательный для Compose параметр
+`CADisableMinimumFrameDurationOnPhone`. Он добавлен вместе с SwiftUI Scene Manifest;
+Debug собирает только активную архитектуру симулятора. Итоговый UI-прогон повторяется.
 
 ## Что продолжает требовать Backend
 
