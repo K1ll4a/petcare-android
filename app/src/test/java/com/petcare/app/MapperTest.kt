@@ -6,6 +6,7 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.data.mapper.toDomain
 import com.petcare.app.data.mapper.toDraft
+import com.petcare.app.data.mapper.toPatchBody
 import com.petcare.app.data.mapper.toRequestBody
 import com.petcare.app.data.remote.dto.JsonCodec
 import com.petcare.app.data.remote.dto.PetDto
@@ -180,20 +181,42 @@ class MapperTest {
         ).jsonObject
         assertEquals("Барсик", body["pet_name"]!!.jsonPrimitive.content)
         assertEquals("курица", body["pet_allergies"]!!.jsonPrimitive.content)
-        assertEquals(JsonNull, body["pet_intolerances"])
-        assertEquals(JsonNull, body["pet_features"])
+        // Создание: пустые необязательные поля не отправляются (API.md §6, пример запроса).
+        assertTrue("pet_intolerances" !in body)
+        assertTrue("pet_features" !in body)
+    }
+
+    @Test
+    fun petPatch_sendsOnlyChangedFields_andNullToClear() {
+        val before = PetDraft(name = "Барсик", typeId = 1, allergies = "курица", intolerances = "молоко")
+        val body = JsonCodec.parse(before.copy(allergies = "", careNotes = "сухой корм").toPatchBody(before)).jsonObject
+        assertEquals(setOf("pet_allergies", "pet_care_notes"), body.keys)
+        assertEquals(JsonNull, body["pet_allergies"]) // очистить поле
+        assertEquals("сухой корм", body["pet_care_notes"]!!.jsonPrimitive.content)
     }
 
     @Test
     fun taskBody_timeIsInSpaceZone_notDeviceZone() {
         val draft = TaskDraft(9, "прогулка", 4, RepeatType.DAILY, LocalDate(2026, 10, 22), LocalTime(20, 0))
-        val moscow = JsonCodec.parse(draft.toRequestBody(TimeZone.of("Europe/Moscow"))).jsonObject
-        val yekat = JsonCodec.parse(draft.toRequestBody(TimeZone.of("Asia/Yekaterinburg"))).jsonObject
-        // 20:00 МСК = 17:00 UTC; 20:00 Екатеринбург = 15:00 UTC.
-        assertEquals(Instant.parse("2026-10-22T17:00:00Z").epochSeconds, moscow["date_time"]!!.jsonPrimitive.content.toLong())
-        assertEquals(Instant.parse("2026-10-22T15:00:00Z").epochSeconds, yekat["date_time"]!!.jsonPrimitive.content.toLong())
-        assertEquals("2026-10-22", moscow["start_date"]!!.jsonPrimitive.content)
-        assertEquals("20:00", moscow["local_time"]!!.jsonPrimitive.content)
+        // Ежедневная: дата начала и местное время пространства, срок считает сервер.
+        val daily = JsonCodec.parse(draft.toRequestBody(TimeZone.of("Europe/Moscow"))).jsonObject
+        assertEquals("2026-10-22", daily["start_date"]!!.jsonPrimitive.content)
+        assertEquals("20:00", daily["local_time"]!!.jsonPrimitive.content)
+        // Разовая: scheduled_at в UTC с Z. 20:00 МСК = 17:00 UTC; 20:00 Екатеринбург = 15:00 UTC.
+        val once = draft.copy(repeat = RepeatType.ONCE)
+        val moscow = JsonCodec.parse(once.toRequestBody(TimeZone.of("Europe/Moscow"))).jsonObject
+        val yekat = JsonCodec.parse(once.toRequestBody(TimeZone.of("Asia/Yekaterinburg"))).jsonObject
+        assertEquals("2026-10-22T17:00:00Z", moscow["scheduled_at"]!!.jsonPrimitive.content)
+        assertEquals("2026-10-22T15:00:00Z", yekat["scheduled_at"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun taskPatch_switchingToOnce_sendsScheduledAt() {
+        val before = TaskDraft(9, "прогулка", 4, RepeatType.DAILY, LocalDate(2026, 10, 22), LocalTime(20, 0))
+        val body = JsonCodec.parse(before.copy(repeat = RepeatType.ONCE).toPatchBody(before, TimeZone.of("Europe/Moscow"))).jsonObject
+        assertEquals(setOf("recurrence", "scheduled_at"), body.keys)
+        assertEquals("once", body["recurrence"]!!.jsonPrimitive.content)
+        assertEquals("2026-10-22T17:00:00Z", body["scheduled_at"]!!.jsonPrimitive.content)
     }
 
     @Test

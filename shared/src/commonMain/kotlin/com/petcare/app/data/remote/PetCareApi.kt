@@ -44,17 +44,21 @@ class PetCareApi(private val http: HttpTransport) {
             ok(http.send("GET", "/task", query = mapOf("space_id" to "$spaceId", "pet_id" to "$petId"))),
         ).map(JsonCodec::task)
 
-    /** ПРЕДПОЛОЖЕНИЕ до задачи Backend #11: пути см. [TaskEndpoints]. Возвращает id задачи. */
+    /**
+     * POST /spaces/{space_id}/tasks (API.md 1.2 §7). Ответ — объект задачи с task_id,
+     * а не элемент списка, поэтому после успеха список перечитывается с сервера.
+     */
     suspend fun createTask(spaceId: Long, body: String): Long =
-        taskIdFrom(ok(http.send("POST", TaskEndpoints.create(spaceId), body = body)))
+        taskIdFrom(ok(http.send("POST", "/spaces/$spaceId/tasks", body = body)))
 
+    /** PATCH /tasks/{task_id} — только изменённые поля. */
     suspend fun updateTask(taskId: Long, body: String): Long =
-        taskIdFrom(ok(http.send("PATCH", TaskEndpoints.update(taskId), body = body)))
+        taskIdFrom(ok(http.send("PATCH", "/tasks/$taskId", body = body)))
 
-    /** Id из ответа: "id" (как в GET /task) или "task_id". */
+    /** Id из ответа: "task_id" (объект задачи) или "id" (элемент списка). */
     private fun taskIdFrom(raw: String): Long {
         val o = JsonCodec.obj(raw)
-        return listOf("id", "task_id").firstNotNullOfOrNull { (o[it] as? JsonPrimitive)?.longOrNull }
+        return listOf("task_id", "id").firstNotNullOfOrNull { (o[it] as? JsonPrimitive)?.longOrNull }
             ?: throw JsonCodec.FormatException("В ответе на сохранение задачи нет id")
     }
 
@@ -71,6 +75,7 @@ class PetCareApi(private val http: HttpTransport) {
     }
 
     private fun defaultCode(http: Int) = when (http) {
+        400 -> "bad_request"
         401 -> "unauthorized"
         403 -> "forbidden"
         404 -> "not_found"
@@ -80,6 +85,7 @@ class PetCareApi(private val http: HttpTransport) {
     }
 
     private fun defaultMessage(http: Int) = when (http) {
+        400 -> "Сервер отклонил запрос."
         401 -> "Сессия истекла. Войдите снова."
         403 -> "Нет доступа к этому пространству."
         404 -> "Данные не найдены."
@@ -87,13 +93,4 @@ class PetCareApi(private val http: HttpTransport) {
         in 500..599 -> "Ошибка на сервере ($http). Повторите позже."
         else -> "Сервер ответил ошибкой $http."
     }
-}
-
-/**
- * Пути сохранения задач. Серверных методов пока нет (задача #11, ladis-la);
- * выбраны по образцу питомцев: POST /spaces/{id}/pets и PATCH /pet/{id}.
- */
-object TaskEndpoints {
-    fun create(spaceId: Long) = "/spaces/$spaceId/tasks"
-    fun update(taskId: Long) = "/task/$taskId"
 }

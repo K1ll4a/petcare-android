@@ -40,6 +40,8 @@ data class TaskDto(
     val itemId: String? = null,
     /** "occurrence_id" */
     val occurrenceId: Long? = null,
+    /** "completion_id" — id выполнения; null, пока не выполнено (API.md 1.2). */
+    val completionId: Long? = null,
 )
 
 /** Профиль питомца: ответы GET/POST /spaces/{id}/pets, GET/PATCH /pet/{id}. */

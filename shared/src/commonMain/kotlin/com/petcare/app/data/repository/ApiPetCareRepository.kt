@@ -1,6 +1,7 @@
 package com.petcare.app.data.repository
 
 import com.petcare.app.data.mapper.toDomain
+import com.petcare.app.data.mapper.toPatchBody
 import com.petcare.app.data.mapper.toRequestBody
 import com.petcare.app.data.remote.PetCareApi
 import com.petcare.app.domain.model.Member
@@ -46,10 +47,11 @@ class ApiPetCareRepository(private val api: PetCareApi) : SpaceRepository, PetRe
     override suspend fun createPet(spaceId: Long, draft: PetDraft): Pet =
         api.createPet(spaceId, draft.toRequestBody()).toDomain(typeNames())
 
-    override suspend fun updatePet(spaceId: Long, petId: Long, draft: PetDraft): Pet {
+    override suspend fun updatePet(spaceId: Long, petId: Long, original: PetDraft, draft: PetDraft): Pet {
         // Сначала убеждаемся, что питомец из выбранного пространства, — иначе не меняем.
         getPet(spaceId, petId)
-        return api.updatePet(petId, draft.toRequestBody()).toDomain(typeNames())
+        return api.updatePet(petId, draft.toPatchBody(original)).toDomain(typeNames())
+            .also { it.checkSpace(spaceId) }
     }
 
     override suspend fun getTaskItems(spaceId: Long, petId: Long): List<TaskItem> =
@@ -60,8 +62,8 @@ class ApiPetCareRepository(private val api: PetCareApi) : SpaceRepository, PetRe
     override suspend fun createTask(space: Space, draft: TaskDraft): Long =
         api.createTask(space.id, draft.toRequestBody(space.zoneOrThrow()))
 
-    override suspend fun updateTask(space: Space, taskId: Long, draft: TaskDraft): Long =
-        api.updateTask(taskId, draft.toRequestBody(space.zoneOrThrow()))
+    override suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft): Long =
+        api.updateTask(taskId, draft.toPatchBody(original, space.zoneOrThrow()))
 
     private fun Pet.checkSpace(spaceId: Long) {
         if (this.spaceId != null && this.spaceId != spaceId) {

@@ -64,9 +64,9 @@ class ControlledRepo : SpaceRepository, PetRepository, TaskRepository {
     override suspend fun getPet(spaceId: Long, petId: Long): Pet = wait("pet:$spaceId:$petId")
     override suspend fun getTaskItems(spaceId: Long, petId: Long): List<TaskItem> = wait("tasks:$spaceId:$petId")
     override suspend fun createPet(spaceId: Long, draft: PetDraft): Pet = wait("createPet")
-    override suspend fun updatePet(spaceId: Long, petId: Long, draft: PetDraft): Pet = wait("updatePet")
+    override suspend fun updatePet(spaceId: Long, petId: Long, original: PetDraft, draft: PetDraft): Pet = wait("updatePet")
     override suspend fun createTask(space: Space, draft: TaskDraft): Long = wait("createTask")
-    override suspend fun updateTask(space: Space, taskId: Long, draft: TaskDraft): Long = wait("updateTask")
+    override suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft): Long = wait("updateTask")
 
     fun has(key: String) = pending[key]?.isNotEmpty() == true
 

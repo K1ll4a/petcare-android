@@ -32,7 +32,8 @@ interface PetRepository {
 
     /** Возвращает профиль, сохранённый сервером. */
     suspend fun createPet(spaceId: Long, draft: PetDraft): Pet
-    suspend fun updatePet(spaceId: Long, petId: Long, draft: PetDraft): Pet
+    /** [original] — профиль до правки: серверу уходят только изменённые поля (PATCH). */
+    suspend fun updatePet(spaceId: Long, petId: Long, original: PetDraft, draft: PetDraft): Pet
 }
 
 interface TaskRepository {
@@ -44,7 +45,8 @@ interface TaskRepository {
      * Возвращает id задачи, подтверждённый сервером; актуальный список затем перечитывается.
      */
     suspend fun createTask(space: Space, draft: TaskDraft): Long
-    suspend fun updateTask(space: Space, taskId: Long, draft: TaskDraft): Long
+    /** [original] — задача до правки: серверу уходят только изменённые поля (PATCH). */
+    suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft): Long
 }
 
 /** Ответ сервера с ошибкой в формате API.md §2: {code, message, fields}. */

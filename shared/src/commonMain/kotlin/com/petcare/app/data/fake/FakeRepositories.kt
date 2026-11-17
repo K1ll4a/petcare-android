@@ -134,7 +134,7 @@ class FakePetCareRepository(
         }.toDomain(typeNames())
     }
 
-    override suspend fun updatePet(spaceId: Long, petId: Long, draft: PetDraft): Pet {
+    override suspend fun updatePet(spaceId: Long, petId: Long, original: PetDraft, draft: PetDraft): Pet {
         checkSpace(spaceId)
         validate(draft)
         return save {
@@ -155,8 +155,12 @@ class FakePetCareRepository(
         }
     }
 
-    override suspend fun updateTask(space: Space, taskId: Long, draft: TaskDraft): Long {
+    override suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft): Long {
         checkSpace(space.id)
+        // Как на сервере (API.md 1.2): питомца задачи сменить нельзя — 400 bad_request.
+        if (draft.petId != original.petId) {
+            throw ApiException(400, "bad_request", "Нельзя изменить питомца задачи")
+        }
         validate(space, draft)
         val names = memberNames(space.id)
         return save {
