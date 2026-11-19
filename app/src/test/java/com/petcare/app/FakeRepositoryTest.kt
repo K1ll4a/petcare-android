@@ -135,7 +135,11 @@ class FakeRepositoryTest {
         val r = repo()
         val created = r.createPet(2, PetDraft("Бобик", 2, allergies = "пыль", intolerances = "лактоза"))
         assertEquals(2L, created.spaceId)
-        r.updatePet(2, created.id, PetDraft("Бобик", 2, allergies = "", intolerances = "лактоза"))
+        r.updatePet(
+            2, created.id,
+            PetDraft("Бобик", 2, allergies = "пыль", intolerances = "лактоза"),
+            PetDraft("Бобик", 2, allergies = "", intolerances = "лактоза"),
+        )
         val reloaded = r.getPet(2, created.id)
         assertNull(reloaded.allergies)
         assertEquals("лактоза", reloaded.intolerances)
@@ -162,7 +166,8 @@ class FakeRepositoryTest {
         assertEquals(Instant.parse("2026-10-23T05:00:00Z"), created.dueAt)
         assertEquals("Гриша", created.task.assigneeName)
 
-        r.updateTask(dacha, id, TaskDraft(21, "погулять подольше", 5, RepeatType.ONCE, LocalDate(2026, 10, 23), LocalTime(11, 0)))
+        val before = TaskDraft(21, "погулять", 3, RepeatType.ONCE, LocalDate(2026, 10, 23), LocalTime(10, 0))
+        r.updateTask(dacha, id, before, TaskDraft(21, "погулять подольше", 5, RepeatType.ONCE, LocalDate(2026, 10, 23), LocalTime(11, 0)))
         val updated = r.getTaskItems(2, 21).filter { it.task.id == id }
         assertEquals(1, updated.size)
         assertEquals("погулять подольше", updated.single().task.title)
@@ -190,6 +195,18 @@ class FakeRepositoryTest {
         } catch (e: IOException) {
             // Ответа нет, но на «сервере» питомец есть — поэтому приложение перечитывает данные.
             assertTrue(r.getPets(1).any { it.name == "Тихоня" })
+        }
+    }
+
+    @Test
+    fun updateTask_changingPet_isRejected400_likeServer() = runBlocking {
+        val r = repo()
+        val dacha = r.getSpaces().first { it.id == 2L }
+        val before = TaskDraft(21, "x", 3, RepeatType.ONCE, LocalDate(2026, 10, 23), LocalTime(10, 0))
+        try {
+            r.updateTask(dacha, 21, before, before.copy(petId = 20)); fail()
+        } catch (e: ApiException) {
+            assertEquals(400, e.httpCode)
         }
     }
 }

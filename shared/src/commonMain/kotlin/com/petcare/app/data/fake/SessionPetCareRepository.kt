@@ -17,10 +17,10 @@ class SessionPetCareRepository(
     override suspend fun getPets(spaceId: Long) = guarded(spaceId) { data.getPets(spaceId) }
     override suspend fun getPet(spaceId: Long, petId: Long) = guarded(spaceId) { data.getPet(spaceId, petId) }
     override suspend fun createPet(spaceId: Long, draft: PetDraft) = guarded(spaceId) { data.createPet(spaceId, draft) }
-    override suspend fun updatePet(spaceId: Long, petId: Long, draft: PetDraft) = guarded(spaceId) { data.updatePet(spaceId, petId, draft) }
+    override suspend fun updatePet(spaceId: Long, petId: Long, original: PetDraft, draft: PetDraft) = guarded(spaceId) { data.updatePet(spaceId, petId, original, draft) }
     override suspend fun getTaskItems(spaceId: Long, petId: Long) = guarded(spaceId) { data.getTaskItems(spaceId, petId) }
     override suspend fun createTask(space: Space, draft: TaskDraft) = guarded(space.id) { data.createTask(space, draft) }
-    override suspend fun updateTask(space: Space, taskId: Long, draft: TaskDraft) = guarded(space.id) { data.updateTask(space, taskId, draft) }
+    override suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft) = guarded(space.id) { data.updateTask(space, taskId, original, draft) }
 
     private suspend fun <T> guarded(spaceId: Long, block: suspend () -> T): T {
         val session = accounts.session.value ?: unauthorized()

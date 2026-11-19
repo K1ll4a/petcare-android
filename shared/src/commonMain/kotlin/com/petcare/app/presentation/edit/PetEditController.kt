@@ -38,6 +38,9 @@ class PetEditController(
 ) {
     private val petId = existing?.id
 
+    /** Профиль до правки — от него считается PATCH «только изменённые поля». */
+    private var original: PetDraft? = existing?.let(PetDraft::from)
+
     private val _state = MutableStateFlow(
         PetEditState(isNew = existing == null, draft = existing?.let(PetDraft::from) ?: PetDraft()),
     )
@@ -83,9 +86,12 @@ class PetEditController(
         val draft = s.draft
         scope.launch {
             attempt {
-                if (petId == null) repo.createPet(spaceId, draft) else repo.updatePet(spaceId, petId, draft)
+                val before = original
+                if (petId == null || before == null) repo.createPet(spaceId, draft)
+                else repo.updatePet(spaceId, petId, before, draft)
             }.fold(
                 { pet ->
+                    if (petId != null) original = PetDraft.from(pet)
                     _state.update { it.copy(draft = PetDraft.from(pet), save = SaveState.Saved()) }
                     onSaved(pet)
                 },

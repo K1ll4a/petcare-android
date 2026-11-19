@@ -93,6 +93,8 @@ fun TaskEditScreen(controller: TaskEditController, onBack: () -> Unit) {
                     selected = s.petId == pet.id,
                     onClick = { controller.edit { it.copy(petId = pet.id) } },
                     label = { Text(pet.name) },
+                    // Сервер не меняет питомца у существующей задачи (API.md 1.2).
+                    enabled = s.isNew,
                 )
             }
         }

@@ -50,13 +50,17 @@ private class SaveRepo : SpaceRepository, PetRepository, TaskRepository {
     override suspend fun getPets(spaceId: Long) = listOf(Pet(10, spaceId, "Tom", 1, "кот"))
     override suspend fun getPet(spaceId: Long, petId: Long) = getPets(spaceId).first()
     override suspend fun createPet(spaceId: Long, draft: PetDraft): Pet { petCalls++; return petSave.await() }
-    override suspend fun updatePet(spaceId: Long, petId: Long, draft: PetDraft): Pet { petCalls++; return petSave.await() }
+    var lastPetOriginal: PetDraft? = null
+    var lastTaskOriginal: TaskDraft? = null
+    override suspend fun updatePet(spaceId: Long, petId: Long, original: PetDraft, draft: PetDraft): Pet {
+        petCalls++; lastPetOriginal = original; return petSave.await()
+    }
     override suspend fun getTaskItems(spaceId: Long, petId: Long) = emptyList<com.petcare.app.domain.model.TaskItem>()
     override suspend fun createTask(space: Space, draft: TaskDraft): Long {
         taskCalls++; lastTask = draft; lastTaskSpace = space; return taskSave.await()
     }
-    override suspend fun updateTask(space: Space, taskId: Long, draft: TaskDraft): Long {
-        taskCalls++; lastTask = draft; return taskSave.await()
+    override suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft): Long {
+        taskCalls++; lastTask = draft; lastTaskOriginal = original; return taskSave.await()
     }
 }
 
@@ -246,5 +250,65 @@ class EditControllerTest {
         c.edit { it.copy(title = "x2") }
         assertEquals(SaveState.Idle, c.state.value.save)
         assertNull(c.state.value.fieldErrors[TaskDraft.FIELD_TITLE])
+    }
+
+    // ---------- задача #23: изменение существующих данных ----------
+
+    private fun existingTask() = ControlledRepo.task(7, 10, 1, "прогулка") // 22.10 10:00 UTC = 13:00 МСК
+
+    @Test
+    fun task_edit_passesOriginal_soOnlyChangesAreSent() = runBlocking {
+        val c = TaskEditController(
+            scope, repo, repo, repo, moscow, existing = existingTask(), defaultPetId = null,
+            onSaved = { saved++ }, onUnconfirmed = { unconfirmed++ }, clock = clock,
+        )
+        c.edit { it.copy(timeText = "14:00") }
+        c.save()
+        assertEquals(LocalTime(13, 0), repo.lastTaskOriginal!!.time)
+        assertEquals(LocalTime(14, 0), repo.lastTask!!.time)
+        repo.taskSave.complete(7)
+        yield()
+        assertEquals(SaveState.Saved(), c.state.value.save)
+    }
+
+    @Test
+    fun task_edit_changingPet_isBlockedOnClient() = runBlocking {
+        val c = TaskEditController(
+            scope, repo, repo, repo, moscow, existing = existingTask(), defaultPetId = null,
+            onSaved = { saved++ }, onUnconfirmed = { unconfirmed++ }, clock = clock,
+        )
+        c.edit { it.copy(pets = it.pets + Pet(11, 1, "Рекс", 2, "собака"), petId = 11) }
+        c.save()
+        assertEquals(0, repo.taskCalls)
+        assertTrue(c.state.value.fieldErrors[TaskDraft.FIELD_PET]!!.contains("изменить нельзя"))
+    }
+
+    @Test
+    fun task_server422_mapsContractFieldNames() = runBlocking {
+        val c = taskController()
+        c.edit { it.copy(title = "x", assigneeId = 3) }
+        c.save()
+        repo.taskSave.completeExceptionally(
+            ApiException(422, "validation_error", "Ошибка", mapOf("task_title" to "Пусто", "scheduled_at" to "Нет пояса")),
+        )
+        yield()
+        assertEquals("Пусто", c.state.value.fieldErrors[TaskDraft.FIELD_TITLE])
+        assertEquals("Нет пояса", c.state.value.fieldErrors[TaskDraft.FIELD_DATE])
+    }
+
+    @Test
+    fun pet_edit_passesOriginal_andNextSaveDiffsFromSaved() = runBlocking {
+        val tom = Pet(10, 1, "Tom", 1, "кот", allergies = "курица")
+        val c = petController(tom)
+        c.edit { it.copy(allergies = "") }
+        c.save()
+        assertEquals("курица", repo.lastPetOriginal!!.allergies)
+        repo.petSave.complete(tom.copy(allergies = null))
+        yield()
+        repo.petSave = CompletableDeferred()
+        c.edit { it.copy(careNotes = "сухой корм") }
+        c.save()
+        // Вторая правка считается от сохранённого сервером профиля, а не от исходного.
+        assertEquals("", repo.lastPetOriginal!!.allergies)
     }
 }

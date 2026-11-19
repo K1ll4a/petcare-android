@@ -55,6 +55,7 @@ object JsonCodec {
         spaceId = o.long("space_id"),
         itemId = o.str("item_id"),
         occurrenceId = o.long("occurrence_id"),
+        completionId = o.long("completion_id"),
     )
 
     fun pet(o: JsonObject) = PetDto(
@@ -104,48 +105,7 @@ object JsonCodec {
         }
     }
 
-    // ---------- сборка тел запросов ----------
-
-    /** POST /spaces/{id}/pets и PATCH /pet/{id}: все поля формы; пустые необязательные — null (очищают значение). */
-    fun petBody(
-        name: String,
-        typeId: Int,
-        features: String?,
-        allergies: String?,
-        intolerances: String?,
-        careNotes: String?,
-    ): String = buildJsonObject {
-        put("pet_name", name)
-        put("pet_type_id", typeId)
-        put("pet_features", features)
-        put("pet_allergies", allergies)
-        put("pet_intolerances", intolerances)
-        put("pet_care_notes", careNotes)
-    }.toString()
-
-    /**
-     * Тело создания/изменения задачи.
-     * ПРЕДПОЛОЖЕНИЕ: серверных методов ещё нет (задача #11). Ключи взяты из ответа GET /task
-     * и требований #11: для ежедневной — дата начала и местное время пространства.
-     * Если Backend выберет другие имена — правится только эта функция.
-     */
-    fun taskBody(
-        petId: Long,
-        name: String,
-        responsibleId: Long,
-        isDaily: Boolean,
-        dateTime: Long,
-        startDate: String?,
-        localTime: String?,
-    ): String = buildJsonObject {
-        put("pet_id", petId)
-        put("task_name", name)
-        put("responsible_id", responsibleId)
-        put("is_daily", isDaily)
-        put("date_time", dateTime)
-        put("start_date", startDate)
-        put("local_time", localTime)
-    }.toString()
+    // Тела запросов создания и изменения — в data/remote/RequestBodies.kt.
 
     // ---------- помощники ----------
 

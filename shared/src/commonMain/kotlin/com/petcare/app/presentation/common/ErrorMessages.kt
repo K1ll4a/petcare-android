@@ -1,5 +1,6 @@
 package com.petcare.app.presentation.common
 
+import com.petcare.app.data.remote.ForbiddenChangeException
 import com.petcare.app.data.remote.dto.JsonCodec
 import com.petcare.app.domain.repository.ApiException
 import com.petcare.app.domain.repository.InvalidServerDataException
@@ -15,6 +16,7 @@ fun Throwable.toUserMessage(fallback: String): String = when (this) {
     }
     is JsonCodec.FormatException -> "Сервер прислал данные в неожиданном формате: $message"
     is InvalidServerDataException -> message ?: fallback
+    is ForbiddenChangeException -> message ?: fallback
     else -> fallback
 }
 

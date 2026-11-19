@@ -69,6 +69,12 @@ class TaskEditController(
 ) {
     private val taskId = existing?.task?.id
 
+    /**
+     * Задача до правки — от неё считается PATCH «только изменённые поля».
+     * После подтверждённого сохранения становится сохранённым вариантом.
+     */
+    private var original: TaskDraft? = space.zone?.let { zone -> existing?.toDraft(zone) }
+
     private val _state = MutableStateFlow(initialState(existing, defaultPetId, clock))
     val state: StateFlow<TaskEditState> = _state.asStateFlow()
 
@@ -150,9 +156,12 @@ class TaskEditController(
         _state.update { it.copy(fieldErrors = emptyMap(), save = SaveState.Saving) }
         scope.launch {
             attempt {
-                if (taskId == null) taskRepo.createTask(space, draft) else taskRepo.updateTask(space, taskId, draft)
+                val before = original
+                if (taskId == null || before == null) taskRepo.createTask(space, draft)
+                else taskRepo.updateTask(space, taskId, before, draft)
             }.fold(
                 { id ->
+                    if (taskId != null) original = draft
                     _state.update { it.copy(save = SaveState.Saved()) }
                     onSaved(id)
                 },
@@ -173,6 +182,11 @@ class TaskEditController(
         if (s.dateText.isNotBlank() && date == null) errors[TaskDraft.FIELD_DATE] = "Неверная дата, нужно ДД.ММ.ГГГГ"
         if (s.timeText.isNotBlank() && time == null) errors[TaskDraft.FIELD_TIME] = "Неверное время, нужно ЧЧ:ММ"
         if (s.petId != null && s.pets.none { it.id == s.petId }) errors[TaskDraft.FIELD_PET] = "Питомец не из этого пространства"
+        // Сервер не меняет питомца у существующей задачи (400) — не отправляем такой запрос.
+        val before = original
+        if (!s.isNew && before != null && s.petId != before.petId) {
+            errors[TaskDraft.FIELD_PET] = "Питомца задачи изменить нельзя — создайте новую задачу"
+        }
         if (s.assigneeId != null && s.members.none { it.id == s.assigneeId }) {
             errors[TaskDraft.FIELD_ASSIGNEE] = "Ответственный не из этого пространства"
         }
@@ -200,10 +214,11 @@ class TaskEditController(
 
         /** Имена полей сервера (422 fields) → поля формы. */
         fun serverFieldToForm(field: String): String? = when (field) {
-            "task_name" -> TaskDraft.FIELD_TITLE
+            // Имена из API.md 1.2 и прежние имена списка задач.
+            "task_title", "task_name" -> TaskDraft.FIELD_TITLE
             "pet_id" -> TaskDraft.FIELD_PET
-            "responsible_id" -> TaskDraft.FIELD_ASSIGNEE
-            "date_time", "start_date" -> TaskDraft.FIELD_DATE
+            "assignee_id", "responsible_id" -> TaskDraft.FIELD_ASSIGNEE
+            "scheduled_at", "date_time", "start_date" -> TaskDraft.FIELD_DATE
             "local_time" -> TaskDraft.FIELD_TIME
             else -> null
         }
