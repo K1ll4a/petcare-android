@@ -3,6 +3,7 @@ package com.petcare.app.data.fake
 import kotlinx.datetime.*
 import com.petcare.app.time.*
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.data.remote.dto.JsonCodec
 import com.petcare.app.platform.*
@@ -21,12 +22,21 @@ class DemoAccountRepository(
     private val store: DemoStateStore,
     private val clock: Clock = Clock.System,
     private val delayMs: Long = 250,
-) : AccountRepository {
+) : AccountRepository, TelegramRepository, DemoTelegramBot {
     private data class User(val id: Long, val name: String, val email: String, val salt: String, val hash: String)
     private val users = mutableListOf<User>()
     private val spaces = mutableListOf<Space>()
     private val memberships = mutableMapOf<Long, MutableMap<Long, SpaceRole>>()
     private val invitations = mutableListOf<Invitation>()
+    /** Привязка Telegram по пользователю — как таблица telegrambinding на сервере. */
+    private data class Binding(val confirmed: Boolean, val notifications: Boolean, val token: String?, val tokenExpires: Instant?)
+    private val telegram = mutableMapOf<Long, Binding>()
+
+    /**
+     * Участник ушёл или удалён: незавершённые задачи переходят владельцу (FR-22).
+     * Подключается в AppContainer к учебным задачам.
+     */
+    var onMemberGone: (suspend (spaceId: Long, userId: Long, ownerId: Long, ownerName: String) -> Unit)? = null
     @kotlin.concurrent.Volatile private var generation = 0L
     private val mutableSession = MutableStateFlow<AccountSession?>(null)
     override val session = mutableSession.asStateFlow()
@@ -115,6 +125,95 @@ class DemoAccountRepository(
         persist()
     }
 
+    // ---------------- Состав группы (FR-21–FR-23) ----------------
+
+    override suspend fun getMembers(spaceId: Long): List<Member> {
+        awaitSession()
+        return members(spaceId).sortedWith(compareBy<Member> { it.role != SpaceRole.OWNER }.thenBy { it.name })
+    }
+
+    override suspend fun leaveSpace(spaceId: Long) {
+        val user = awaitSession()
+        val members = memberships[spaceId]?.takeIf { it.containsKey(user.userId) } ?: fail(403, "Нет доступа к пространству.")
+        if (members[user.userId] == SpaceRole.OWNER) {
+            if (members.size > 1) fail(409, "Сначала передайте владение другому участнику — после этого вы сможете выйти.")
+            fail(409, "Вы единственный участник. Чтобы выйти, пригласите нового участника и передайте ему владение.")
+        }
+        removeMembership(spaceId, user.userId)
+    }
+
+    override suspend fun removeMember(spaceId: Long, userId: Long) {
+        val user = awaitSession()
+        requireOwner(spaceId, user, "Удалять участников может только владелец.")
+        if (userId == user.userId) fail(400, "Себя удалить нельзя — используйте «Выйти из пространства».")
+        if (memberships.getValue(spaceId)[userId] == null) fail(404, "Участник уже не состоит в пространстве.")
+        removeMembership(spaceId, userId)
+    }
+
+    override suspend fun transferOwnership(spaceId: Long, userId: Long) {
+        val user = awaitSession()
+        requireOwner(spaceId, user, "Передать владение может только владелец.")
+        val members = memberships.getValue(spaceId)
+        if (userId == user.userId) fail(400, "Вы уже владелец.")
+        if (members[userId] == null) fail(404, "Участник уже не состоит в пространстве.")
+        // Один владелец в пространстве (BR-08): роли меняются одной операцией.
+        members[userId] = SpaceRole.OWNER
+        members[user.userId] = SpaceRole.MEMBER
+        persist()
+    }
+
+    private suspend fun removeMembership(spaceId: Long, userId: Long) {
+        val members = memberships.getValue(spaceId)
+        members.remove(userId)
+        persist()
+        val ownerId = members.entries.first { it.value == SpaceRole.OWNER }.key
+        onMemberGone?.invoke(spaceId, userId, ownerId, users.first { it.id == ownerId }.name)
+    }
+
+    // ---------------- Telegram (API.md 1.2 §7.1, учебная версия) ----------------
+
+    override suspend fun getStatus(): TelegramStatus {
+        val user = awaitSession()
+        val b = telegram[user.userId]
+        return TelegramStatus(isConfirmed = b?.confirmed == true, notificationsEnabled = b?.confirmed == true && b.notifications)
+    }
+
+    override suspend fun createLink(): TelegramLink {
+        val user = awaitSession()
+        val token = randomHex(16)
+        val expires = clock.instant() + 10.minutes
+        val old = telegram[user.userId]
+        // Новая ссылка заменяет прежнюю; подтверждённая привязка не сбрасывается.
+        telegram[user.userId] = Binding(old?.confirmed == true, old?.notifications ?: true, token, expires)
+        persist()
+        return TelegramLink("https://t.me/petcare_demo_bot?start=$token", "petcare_demo_bot", expires)
+    }
+
+    /** Учебная замена нажатия Start в боте: подтверждает только действующую ссылку. */
+    override suspend fun simulateBotStart() {
+        val user = awaitSession()
+        val b = telegram[user.userId]
+        val expires = b?.tokenExpires
+        if (b?.token == null || expires == null || clock.instant() >= expires) fail(409, "Ссылка истекла или не создана. Получите новую.")
+        telegram[user.userId] = Binding(confirmed = true, notifications = true, token = null, tokenExpires = null)
+        persist()
+    }
+
+    override suspend fun setNotifications(enabled: Boolean): TelegramStatus {
+        val user = awaitSession()
+        val b = telegram[user.userId]
+        if (b?.confirmed != true) fail(409, "Сначала подтвердите привязку: откройте ссылку и нажмите Start в боте.")
+        telegram[user.userId] = b.copy(notifications = enabled)
+        persist()
+        return getStatus()
+    }
+
+    override suspend fun unlink() {
+        val user = awaitSession()
+        telegram.remove(user.userId)
+        persist()
+    }
+
     /** Проверка членства перед каждым обращением к учебным питомцам/задачам. */
     fun requireSpace(spaceId: Long): Space {
         val user = session.value ?: fail(401, "Войдите в аккаунт.")
@@ -133,8 +232,13 @@ class DemoAccountRepository(
         if (before != session.value) fail(401, "Сессия завершена. Войдите снова.")
         return before
     }
-    private fun requireOwner(spaceId: Long, user: AccountSession) {
-        if (memberships[spaceId]?.get(user.userId) != SpaceRole.OWNER) fail(403, "Приглашениями управляет только владелец.")
+    private fun requireOwner(spaceId: Long, user: AccountSession, message: String = "Приглашениями управляет только владелец.") {
+        val members = memberships[spaceId] ?: fail(403, "Нет доступа к пространству.")
+        when (members[user.userId]) {
+            null -> fail(403, "Нет доступа к пространству.")
+            SpaceRole.OWNER -> Unit
+            else -> throw ApiException(403, "not_owner", message)
+        }
     }
     private fun normalize(email: String) = email.trim().lowercase()
     private fun fail(code: Int, message: String): Nothing = throw ApiException(code, "demo_error", message)
@@ -165,6 +269,12 @@ class DemoAccountRepository(
         put("invitations", JsonArray(invitations.map { i -> buildJsonObject {
             put("code", i.code); put("space", i.spaceId); put("expires", i.expiresAt.toEpochMilliseconds()); put("revoked", i.revoked); put("used", i.used)
         } }))
+        put("telegram", buildJsonObject {
+            telegram.forEach { (userId, b) -> put(userId.toString(), buildJsonObject {
+                put("confirmed", b.confirmed); put("notifications", b.notifications)
+                put("token", b.token); put("expires", b.tokenExpires?.toEpochMilliseconds())
+            }) }
+        })
     }.toString())
 
     private fun restore(raw: String) {
@@ -177,6 +287,15 @@ class DemoAccountRepository(
             val zone = TimeZone.of(s.getValue("timezone").jsonPrimitive.content)
             spaces += Space(id, s.getValue("name").jsonPrimitive.content, zone.id, zone)
             memberships[id] = s.getValue("members").jsonObject.map { (key, value) -> key.toLong() to SpaceRole.valueOf(value.jsonPrimitive.content) }.toMap().toMutableMap()
+        }
+        // Поле появилось в задаче #28: в старом сохранении его нет — привязок тоже нет.
+        (data["telegram"] as? JsonObject)?.forEach { (userId, el) -> val b = el.jsonObject
+            telegram[userId.toLong()] = Binding(
+                confirmed = b.getValue("confirmed").jsonPrimitive.boolean,
+                notifications = b.getValue("notifications").jsonPrimitive.boolean,
+                token = b["token"]?.jsonPrimitive?.contentOrNull,
+                tokenExpires = b["expires"]?.jsonPrimitive?.longOrNull?.let(Instant::fromEpochMilliseconds),
+            )
         }
         data.getValue("invitations").jsonArray.forEach { el -> val i = el.jsonObject
             invitations += Invitation(i.getValue("code").jsonPrimitive.content, i.getValue("space").jsonPrimitive.long, Instant.fromEpochMilliseconds(i.getValue("expires").jsonPrimitive.long), i.getValue("revoked").jsonPrimitive.boolean, i.getValue("used").jsonPrimitive.boolean)

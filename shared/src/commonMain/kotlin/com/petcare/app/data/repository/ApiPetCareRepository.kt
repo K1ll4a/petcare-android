@@ -65,6 +65,10 @@ class ApiPetCareRepository(private val api: PetCareApi) : SpaceRepository, PetRe
     override suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft): Long =
         api.updateTask(taskId, draft.toPatchBody(original, space.zoneOrThrow()))
 
+    /** Ссылка из Telegram: ищем среди задач, которые сервер отдаёт этому аккаунту. */
+    override suspend fun findTask(taskId: Long, occurrenceId: Long?): TaskItem? =
+        api.getAllTasks().map { it.toDomain() }.pickLinkedTask(taskId, occurrenceId)
+
     private fun Pet.checkSpace(spaceId: Long) {
         if (this.spaceId != null && this.spaceId != spaceId) {
             throw InvalidServerDataException("Питомец ${this.name} не из выбранного пространства")
@@ -75,3 +79,13 @@ class ApiPetCareRepository(private val api: PetCareApi) : SpaceRepository, PetRe
 /** Без верного пояса нельзя перевести дату и время формы в срок — не отправляем. */
 fun Space.zoneOrThrow() = zone
     ?: throw InvalidServerDataException("Неверный часовой пояс пространства «$timezoneId»")
+
+/**
+ * Из всех доступных строк — экземпляр из ссылки, а если его уже нет в списке,
+ * ближайшая строка той же задачи. Строки без пространства не открываются.
+ */
+internal fun List<TaskItem>.pickLinkedTask(taskId: Long, occurrenceId: Long?): TaskItem? {
+    val own = filter { it.task.id == taskId && it.spaceId != null }
+    return own.firstOrNull { occurrenceId != null && it.occurrenceId == occurrenceId }
+        ?: own.maxByOrNull { it.dueAt }
+}

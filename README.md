@@ -119,6 +119,8 @@ bash scripts/check-ios.sh
 Мобильные разработчики работают в этом репозитории; при смене интерфейса проверяют обе платформы.
 Настоящая авторизация, межустройственная синхронизация, удаление участника и передача владения ещё не реализованы.
 
+Состав группы, Telegram-настройки, ссылка `petcare://tasks/…` и очистка данных при отзыве доступа (задача #28): [docs/task28-group-telegram-access.md](docs/task28-group-telegram-access.md).
+
 Проверки и ограничения миграции: [docs/multiplatform.md](docs/multiplatform.md).
 Историческая проверка Android до миграции: [docs/verification.md](docs/verification.md).
 GitHub Actions: **Android** собирает APK и тесты; **iOS** собирает приложение симулятора и выполняет Native/XCTest проверки.

@@ -19,9 +19,10 @@ class HomeViewModel(
     pets: PetRepository,
     tasks: TaskRepository,
     initialSpaceId: Long? = null,
+    onAccessLost: ((Long) -> Unit)? = null,
 ) : ViewModel() {
 
-    private val controller = HomeController(viewModelScope, spaces, pets, tasks)
+    private val controller = HomeController(viewModelScope, spaces, pets, tasks, onAccessLost = onAccessLost)
 
     val state: StateFlow<HomeUiState> = controller.state
 
@@ -31,6 +32,8 @@ class HomeViewModel(
 
     fun selectSpace(spaceId: Long) = controller.selectSpace(spaceId)
     fun selectPet(petId: Long) = controller.selectPet(petId)
+    /** Задача из ссылки Telegram: показать её питомца. */
+    fun showPetOf(task: TaskItem) = controller.selectPet(task.task.petId)
     fun retry() = controller.retry()
     fun refresh() = controller.refresh()
     fun reloadAfterSave(selectPetId: Long? = null) = controller.reloadAfterSave(selectPetId)
@@ -45,8 +48,9 @@ class HomeViewModel(
             pets: PetRepository,
             tasks: TaskRepository,
             initialSpaceId: Long? = null,
+            onAccessLost: ((Long) -> Unit)? = null,
         ): ViewModelProvider.Factory = viewModelFactory {
-            initializer { HomeViewModel(spaces, pets, tasks, initialSpaceId) }
+            initializer { HomeViewModel(spaces, pets, tasks, initialSpaceId, onAccessLost) }
         }
     }
 }

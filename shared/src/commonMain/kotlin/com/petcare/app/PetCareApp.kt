@@ -15,22 +15,39 @@ import com.petcare.app.presentation.account.*
 import com.petcare.app.presentation.edit.*
 import com.petcare.app.presentation.home.*
 import com.petcare.app.platform.PetCareBackHandler
+import com.petcare.app.navigation.PendingDeepLinks
+import com.petcare.app.presentation.settings.SettingsScreen
+import com.petcare.app.presentation.settings.TelegramViewModel
+import com.petcare.app.time.offsetLabel
+import kotlinx.datetime.Clock
+import kotlinx.datetime.todayIn
 
 private sealed interface Screen {
     data object Home : Screen
     data class Profile(val pet: Pet) : Screen
     data object Invitations : Screen
+    data object Settings : Screen
+    /** Задача из ссылки Telegram; доступ уже подтверждён сервером. */
+    data class TaskCard(val task: TaskItem) : Screen
     data class EditPet(val space: Space, val pet: Pet?, val token: Long) : Screen
     data class EditTask(val space: Space, val task: TaskItem?, val petId: Long?, val token: Long) : Screen
 }
 
 @Composable
 fun PetCareApp(container: AppContainer) {
-    val vm: AccountViewModel = viewModel(factory = AccountViewModel.Factory(container.accountRepository))
+    val vm: AccountViewModel = viewModel(factory = AccountViewModel.Factory(container.accountRepository, container.taskRepository))
     val controller = vm.controller
     val state by controller.state.collectAsStateWithLifecycle()
     var confirmLogout by remember { mutableStateOf(false) }
-    if (state.session == null) AuthScreen(state, controller)
+    // Ссылка из Telegram ждёт входа; после входа открывается с проверкой доступа (задача #28).
+    val pendingLink by PendingDeepLinks.link.collectAsStateWithLifecycle()
+    LaunchedEffect(state.session?.generation, pendingLink) {
+        if (state.session != null && pendingLink != null) PendingDeepLinks.take()?.let(controller::openTaskLink)
+    }
+    if (state.session == null) AuthScreen(
+        state, controller,
+        notice = if (pendingLink != null) "Войдите, чтобы открыть задачу из Telegram." else null,
+    )
     else {
         val logout = { confirmLogout = true }
         if (state.selectedSpaceId == null) SpacesScreen(state, controller, logout)
@@ -59,10 +76,17 @@ internal fun ScopedViewModels(content: @Composable () -> Unit) {
 
 @Composable
 private fun WorkspaceApp(container: AppContainer, account: AccountUiState, controller: AccountController, logout: () -> Unit) {
-    val home: HomeViewModel = viewModel(factory = HomeViewModel.Factory(container.spaceRepository, container.petRepository, container.taskRepository, account.selectedSpaceId))
+    val home: HomeViewModel = viewModel(factory = HomeViewModel.Factory(
+        container.spaceRepository, container.petRepository, container.taskRepository, account.selectedSpaceId,
+        // Подтверждённый сервером отзыв доступа закрывает пространство вместе с его кешем.
+        onAccessLost = controller::onAccessRevoked,
+    ))
+    val telegram: TelegramViewModel = viewModel(factory = TelegramViewModel.Factory(container.telegramRepository, container.demoTelegramBot))
     val homeState by home.state.collectAsStateWithLifecycle()
     val currentSpace = (homeState as? HomeUiState.Ready)?.space
-    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+    val linked = account.linkedTask?.takeIf { it.spaceId == account.selectedSpaceId }
+    var screen by remember { mutableStateOf<Screen>(if (linked != null) Screen.TaskCard(linked) else Screen.Home) }
+    LaunchedEffect(Unit) { controller.consumeLinkedTask() }
     var formSequence by remember { mutableStateOf(0L) }
     fun nextFormId(): Long = ++formSequence
     val back = { screen = Screen.Home }
@@ -84,7 +108,7 @@ private fun WorkspaceApp(container: AppContainer, account: AccountUiState, contr
         Surface(tonalElevation = 2.dp) {
             Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(onClick = controller::showSpaces) { Text("Пространства") }
-                if (currentSpace?.role == SpaceRole.OWNER) TextButton(onClick = { screen = Screen.Invitations }) { Text("Приглашения") }
+                TextButton(onClick = { screen = Screen.Settings }) { Text("Настройки") }
                 TextButton(onClick = logout) { Text("Выйти") }
             }
         }
@@ -107,7 +131,11 @@ private fun WorkspaceApp(container: AppContainer, account: AccountUiState, contr
                     Button(onClick = { home.currentSpace?.let { screen = Screen.EditPet(it, s.pet, nextFormId()) } }) { Text("Изменить профиль") }
                     TextButton(onClick = back) { Text("К задачам") }
                 }
-                Screen.Invitations -> currentSpace?.let { InvitationsScreen(account, it.id, controller, back) }
+                Screen.Invitations -> account.selectedSpaceId?.let { InvitationsScreen(account, it, controller) { screen = Screen.Settings } }
+                Screen.Settings -> account.selectedSpaceId?.let { spaceId ->
+                    SettingsScreen(account, controller, spaceId, telegram.controller, onInvitations = { screen = Screen.Invitations }, onBack = back)
+                }
+                is Screen.TaskCard -> LinkedTaskCard(s.task, currentSpace, onOpenPet = { home.showPetOf(s.task); back() })
                 is Screen.EditPet -> key(s.token) { ScopedViewModels {
                     val vm: PetEditViewModel = viewModel(factory = PetEditViewModel.Factory(container.petRepository, s.space.id, s.pet, { pet -> home.reloadAfterSave(pet.id) }, { home.refresh() }))
                     PetEditScreen(vm.controller, back)
@@ -118,5 +146,24 @@ private fun WorkspaceApp(container: AppContainer, account: AccountUiState, contr
                 } }
             }
         }
+    }
+}
+
+/** Карточка задачи из ссылки Telegram. Показывается только после проверки доступа сервером. */
+@Composable
+private fun LinkedTaskCard(task: TaskItem, space: Space?, onOpenPet: () -> Unit) {
+    AccountPage("Задача из Telegram") {
+        Text(task.task.title.replaceFirstChar { it.titlecase() }, style = MaterialTheme.typography.headlineSmall)
+        Text("Состояние: ${task.status.label()}")
+        val zone = space?.zone
+        if (zone != null) {
+            val formatter = SpaceTimeFormatter(zone, Clock.System.todayIn(zone))
+            Text("Срок: ${formatter.format(task.dueAt)} (${space?.timezoneId}, UTC${zone.offsetLabel(task.dueAt)})")
+        } else {
+            Text("Срок появится после загрузки пространства.")
+        }
+        Text("Ответственный: ${task.task.assigneeName ?: "участник #${task.task.assigneeId}"}")
+        task.completedByName?.let { Text("Выполнил(а): $it") }
+        Button(onClick = onOpenPet) { Text("К задачам питомца") }
     }
 }

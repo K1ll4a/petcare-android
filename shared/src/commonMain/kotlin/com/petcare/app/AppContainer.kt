@@ -16,4 +16,16 @@ class AppContainer(store: DemoStateStore) {
     val spaceRepository: SpaceRepository = repository
     val petRepository: PetRepository = repository
     val taskRepository: TaskRepository = repository
+
+    /** Учебная привязка Telegram; серверная — serverTelegramRepository() после серверного входа. */
+    val telegramRepository: TelegramRepository = accounts
+    /** Только в учебном режиме: имитация нажатия Start в боте. На сервере null. */
+    val demoTelegramBot: DemoTelegramBot? = accounts
+
+    init {
+        // FR-22: незавершённые задачи ушедшего или удалённого участника переходят владельцу.
+        accounts.onMemberGone = { spaceId, userId, ownerId, ownerName ->
+            data.reassignOpenTasks(spaceId, userId, ownerId, ownerName)
+        }
+    }
 }

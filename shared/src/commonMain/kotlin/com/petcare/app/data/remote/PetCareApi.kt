@@ -55,6 +55,27 @@ class PetCareApi(private val http: HttpTransport) {
     suspend fun updateTask(taskId: Long, body: String): Long =
         taskIdFrom(ok(http.send("PATCH", "/tasks/$taskId", body = body)))
 
+    /**
+     * Все задачи пространств пользователя: GET /task без фильтров. Сервер сам отдаёт только
+     * доступные пространства — для поиска задачи по ссылке из Telegram.
+     */
+    suspend fun getAllTasks(): List<TaskDto> =
+        JsonCodec.list(ok(http.send("GET", "/task"))).map(JsonCodec::task)
+
+    // ---- Telegram (API.md 1.2 §7.1) ----
+
+    suspend fun getTelegram(): TelegramStatusDto = TelegramWire.status(ok(http.send("GET", "/telegram")))
+
+    suspend fun createTelegramLink(): TelegramLinkDto =
+        TelegramWire.link(ok(http.send("POST", "/telegram/link", body = "{}")))
+
+    suspend fun setTelegramNotifications(enabled: Boolean): TelegramStatusDto =
+        TelegramWire.status(ok(http.send("PATCH", "/telegram/notifications", body = TelegramWire.notificationsBody(enabled))))
+
+    suspend fun deleteTelegram() {
+        ok(http.send("DELETE", "/telegram"))
+    }
+
     /** Id из ответа: "task_id" (объект задачи) или "id" (элемент списка). */
     private fun taskIdFrom(raw: String): Long {
         val o = JsonCodec.obj(raw)
