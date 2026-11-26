@@ -112,6 +112,7 @@ class AccountController(
      * закрываем его экраны — их ViewModel и кеш очищаются вместе с ними — и перечитываем список.
      */
     fun onAccessRevoked(spaceId: Long) {
+        if (state.value.selectedSpaceId != spaceId) return
         val name = state.value.spaces.firstOrNull { it.id == spaceId }?.name
         cancelOperation()
         val message = "Доступ к пространству${name?.let { " «$it»" }.orEmpty()} закрыт. Его данные убраны с экрана."
@@ -120,7 +121,7 @@ class AccountController(
             selectedSpaceId = if (state.value.selectedSpaceId == spaceId) null else state.value.selectedSpaceId,
             members = emptyList(), invitations = emptyList(), linkedTask = null, busy = false, error = null,
         )
-        runOperation { state.value.copy(spaces = accounts.getSpaces(), notice = message) }
+        runOperation { state.value.copy(spaces = accounts.getSpaces().filterNot { it.id == spaceId }, notice = message) }
     }
 
     /** Состав и роль перечитываются с сервера: передача владения меняет и роль текущего пользователя. */
@@ -129,7 +130,9 @@ class AccountController(
         if (spaces.none { it.id == spaceId }) {
             return state.value.copy(spaces = spaces, selectedSpaceId = null, members = emptyList(), notice = "Доступ к пространству закрыт.")
         }
-        return state.value.copy(spaces = spaces, members = accounts.getMembers(spaceId), notice = notice)
+        val members = accounts.getMembers(spaceId)
+        val invitations = state.value.invitations.takeIf { spaces.any { s -> s.id == spaceId && s.role == SpaceRole.OWNER } }.orEmpty()
+        return state.value.copy(spaces = spaces, members = members, invitations = invitations, notice = notice)
     }
 
     // ---------------- Ссылка на задачу из Telegram ----------------
@@ -179,6 +182,11 @@ class AccountController(
             result.fold(
                 { mutableState.value = it.copy(session = accounts.session.value, busy = false, error = null) },
                 { e ->
+                    val selectedSpace = state.value.selectedSpaceId
+                    if (e is ApiException && e.isAccessLost && selectedSpace != null) {
+                        onAccessRevoked(selectedSpace)
+                        return@launch
+                    }
                     val session = accounts.session.value
                     mutableState.value = if (session == null && state.value.session != null) AccountUiState()
                     else state.value.copy(session = session, busy = false, error = if (e is ApiException) e.message else e.toUserMessage("Не удалось выполнить действие. Повторите."))

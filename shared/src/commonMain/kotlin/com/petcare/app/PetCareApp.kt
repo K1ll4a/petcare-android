@@ -85,11 +85,23 @@ private fun WorkspaceApp(container: AppContainer, account: AccountUiState, contr
     val homeState by home.state.collectAsStateWithLifecycle()
     val currentSpace = (homeState as? HomeUiState.Ready)?.space
     val linked = account.linkedTask?.takeIf { it.spaceId == account.selectedSpaceId }
-    var screen by remember { mutableStateOf<Screen>(if (linked != null) Screen.TaskCard(linked) else Screen.Home) }
-    LaunchedEffect(Unit) { controller.consumeLinkedTask() }
+    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+    LaunchedEffect(linked) {
+        if (linked != null) {
+            screen = Screen.TaskCard(linked)
+            controller.consumeLinkedTask()
+        }
+    }
     var formSequence by remember { mutableStateOf(0L) }
     fun nextFormId(): Long = ++formSequence
     val back = { screen = Screen.Home }
+    val homeNavigation = HomeNavigation(
+        onAddPet = { home.currentSpace?.let { screen = Screen.EditPet(it, null, nextFormId()) } },
+        onEditPet = { screen = Screen.Profile(it) },
+        onSelectSpace = controller::selectSpace,
+        onAddTask = { home.currentSpace?.let { screen = Screen.EditTask(it, null, (home.state.value as? HomeUiState.Ready)?.selectedPetId, nextFormId()) } },
+        onEditTask = { key -> home.findTask(key)?.let { task -> home.currentSpace?.let { screen = Screen.EditTask(it, task, task.task.petId, nextFormId()) } } },
+    )
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, home) {
         // Первый ON_RESUME сопровождает начальную загрузку ViewModel, повторный обновляет данные.
@@ -114,13 +126,7 @@ private fun WorkspaceApp(container: AppContainer, account: AccountUiState, contr
         }
         Box(Modifier.weight(1f)) {
             when (val s = screen) {
-                Screen.Home -> HomeScreen(home, HomeNavigation(
-                    onAddPet = { home.currentSpace?.let { screen = Screen.EditPet(it, null, nextFormId()) } },
-                    onEditPet = { screen = Screen.Profile(it) },
-                    onSelectSpace = controller::selectSpace,
-                    onAddTask = { home.currentSpace?.let { screen = Screen.EditTask(it, null, (home.state.value as? HomeUiState.Ready)?.selectedPetId, nextFormId()) } },
-                    onEditTask = { key -> home.findTask(key)?.let { task -> home.currentSpace?.let { screen = Screen.EditTask(it, task, task.task.petId, nextFormId()) } } },
-                ))
+                Screen.Home -> HomeScreen(home, homeNavigation)
                 is Screen.Profile -> AccountPage("Профиль питомца") {
                     Text(s.pet.name, style = MaterialTheme.typography.headlineMedium)
                     Text(s.pet.typeName ?: "Вид не указан")
@@ -135,7 +141,15 @@ private fun WorkspaceApp(container: AppContainer, account: AccountUiState, contr
                 Screen.Settings -> account.selectedSpaceId?.let { spaceId ->
                     SettingsScreen(account, controller, spaceId, telegram.controller, onInvitations = { screen = Screen.Invitations }, onBack = back)
                 }
-                is Screen.TaskCard -> LinkedTaskCard(s.task, currentSpace, onOpenPet = { home.showPetOf(s.task); back() })
+                is Screen.TaskCard -> {
+                    val ready = homeState as? HomeUiState.Ready
+                    val pets = (ready?.pets as? PetsState.Content)?.items.orEmpty()
+                    if (ready != null && ready.space.id == s.task.spaceId && pets.any { it.id == s.task.task.petId }) {
+                        LinkedTaskCard(s.task, ready.space, onOpenPet = { home.showPetOf(s.task); back() })
+                    } else {
+                        HomeScreen(home, homeNavigation)
+                    }
+                }
                 is Screen.EditPet -> key(s.token) { ScopedViewModels {
                     val vm: PetEditViewModel = viewModel(factory = PetEditViewModel.Factory(container.petRepository, s.space.id, s.pet, { pet -> home.reloadAfterSave(pet.id) }, { home.refresh() }))
                     PetEditScreen(vm.controller, back)
@@ -158,7 +172,7 @@ private fun LinkedTaskCard(task: TaskItem, space: Space?, onOpenPet: () -> Unit)
         val zone = space?.zone
         if (zone != null) {
             val formatter = SpaceTimeFormatter(zone, Clock.System.todayIn(zone))
-            Text("Срок: ${formatter.format(task.dueAt)} (${space?.timezoneId}, UTC${zone.offsetLabel(task.dueAt)})")
+            Text("Срок: ${formatter.format(task.dueAt)} (${space.timezoneId}, UTC${zone.offsetLabel(task.dueAt)})")
         } else {
             Text("Срок появится после загрузки пространства.")
         }

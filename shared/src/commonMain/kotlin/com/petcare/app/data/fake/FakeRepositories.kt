@@ -192,11 +192,12 @@ class FakePetCareRepository(
     suspend fun reassignOpenTasks(spaceId: Long, fromUserId: Long, toUserId: Long, toName: String) {
         data()
         lock.withLock {
-            tasks.replaceAll { t ->
+            for (index in tasks.indices) {
+                val t = tasks[index]
                 val open = t.status != "done" && t.status != "missed" && t.status != "cancelled"
                 if (t.spaceId == spaceId && t.responsibleId == fromUserId && open) {
-                    t.copy(responsibleId = toUserId, responsibleName = toName)
-                } else t
+                    tasks[index] = t.copy(responsibleId = toUserId, responsibleName = toName)
+                }
             }
         }
     }

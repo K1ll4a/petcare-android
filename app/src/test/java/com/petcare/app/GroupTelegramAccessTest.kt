@@ -34,19 +34,19 @@ class GroupTelegramAccessTest {
 
     // ---------------- состав группы ----------------
 
-    @Test fun members_visibleToAnyMember_ownerFirst() = runBlocking {
+    @Test fun members_visibleToAnyMember_ownerFirst(): Unit = runBlocking {
         val r = accounts(); r.login("anna@example.com", "demo12345")
         assertEquals(listOf("Гриша" to SpaceRole.OWNER, "Аня" to SpaceRole.MEMBER), r.getMembers(1).map { it.name to it.role })
         expectError(403) { r.getMembers(2) }
     }
 
-    @Test fun memberCannotManageGroup() = runBlocking {
+    @Test fun memberCannotManageGroup(): Unit = runBlocking {
         val r = accounts(); r.login("anna@example.com", "demo12345")
         assertEquals("not_owner", expectError(403) { r.removeMember(1, 3) }.code)
         assertEquals("not_owner", expectError(403) { r.transferOwnership(1, 4) }.code)
     }
 
-    @Test fun ownerCannotLeave_untilTransfer_thenLeaves_andOneOwnerRemains() = runBlocking {
+    @Test fun ownerCannotLeave_untilTransfer_thenLeaves_andOneOwnerRemains(): Unit = runBlocking {
         val r = accounts(); r.login("grisha@example.com", "demo12345")
         assertTrue(expectError(409) { r.leaveSpace(1) }.message.contains("передайте владение"))
         r.transferOwnership(1, 4)
@@ -60,13 +60,13 @@ class GroupTelegramAccessTest {
         assertEquals(SpaceRole.OWNER, restored.getSpaces().first { it.id == 1L }.role)
     }
 
-    @Test fun soleOwner_getsExplanation() = runBlocking {
+    @Test fun soleOwner_getsExplanation(): Unit = runBlocking {
         val r = accounts(); r.login("anna@example.com", "demo12345")
         val space = r.createSpace("Своё", "Europe/Moscow")
         assertTrue(expectError(409) { r.leaveSpace(space.id) }.message.contains("единственный участник"))
     }
 
-    @Test fun removedMember_losesThatSpaceOnly() = runBlocking {
+    @Test fun removedMember_losesThatSpaceOnly(): Unit = runBlocking {
         val r = accounts(); r.login("oleg@example.com", "demo12345")
         expectError(400) { r.removeMember(2, 5) } // себя — нельзя
         r.removeMember(2, 3)
@@ -76,7 +76,7 @@ class GroupTelegramAccessTest {
         r.requireSpace(1) // доступ к другому пространству остаётся
     }
 
-    @Test fun removedMembersOpenTasks_goToOwner_doneStayInHistory() = runBlocking {
+    @Test fun removedMembersOpenTasks_goToOwner_doneStayInHistory(): Unit = runBlocking {
         val r = accounts()
         val data = FakePetCareRepository(RawJsonSource { DemoFixture.json }, clock = clock, baseDelayMs = 0)
         r.onMemberGone = { spaceId, userId, ownerId, ownerName -> data.reassignOpenTasks(spaceId, userId, ownerId, ownerName) }
@@ -93,7 +93,7 @@ class GroupTelegramAccessTest {
 
     // ---------------- Telegram ----------------
 
-    @Test fun telegram_notConfirmedUntilBotStart_andStateSurvivesRestart() = runBlocking {
+    @Test fun telegram_notConfirmedUntilBotStart_andStateSurvivesRestart(): Unit = runBlocking {
         val r = accounts(); r.login("grisha@example.com", "demo12345")
         assertFalse(r.getStatus().isConfirmed)
         val link = r.createLink()
@@ -110,7 +110,7 @@ class GroupTelegramAccessTest {
         assertFalse(restored.getStatus().isConfirmed) // привязка — у конкретного аккаунта
     }
 
-    @Test fun telegram_expiredLink_doesNotConfirm_andUnlinkClears() = runBlocking {
+    @Test fun telegram_expiredLink_doesNotConfirm_andUnlinkClears(): Unit = runBlocking {
         val r = accounts(); r.login("grisha@example.com", "demo12345")
         r.createLink(); now += 11.minutes
         expectError(409) { r.simulateBotStart() }
@@ -119,7 +119,7 @@ class GroupTelegramAccessTest {
         assertFalse(r.getStatus().isConfirmed)
     }
 
-    @Test fun telegramController_switchFollowsServer_andErrorKeepsValue() = runBlocking {
+    @Test fun telegramController_switchFollowsServer_andErrorKeepsValue(): Unit = runBlocking {
         val r = accounts(); r.login("grisha@example.com", "demo12345")
         r.createLink(); r.simulateBotStart()
         var fail = false
@@ -145,7 +145,7 @@ class GroupTelegramAccessTest {
         } finally { scope.cancel() }
     }
 
-    @Test fun telegramController_waitsForBot_untilServerConfirms() = runBlocking {
+    @Test fun telegramController_waitsForBot_untilServerConfirms(): Unit = runBlocking {
         val r = accounts(); r.login("grisha@example.com", "demo12345")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         try {
@@ -171,7 +171,7 @@ class GroupTelegramAccessTest {
         return Triple(r, session, AccountController(scope, r, session))
     }
 
-    @Test fun taskLink_opensOwnTask_inItsSpace() = runBlocking {
+    @Test fun taskLink_opensOwnTask_inItsSpace(): Unit = runBlocking {
         val (r, session, c) = setup()
         c.login("grisha@example.com", "demo12345"); awaitIdle(c)
         val task = session.getTaskItems(2, session.getPets(2).first().id).first()
@@ -182,7 +182,17 @@ class GroupTelegramAccessTest {
         r.logout()
     }
 
-    @Test fun taskLink_otherAccount_seesNoTaskData() = runBlocking {
+    @Test fun taskLink_missingOccurrence_doesNotOpenAnotherOccurrence(): Unit = runBlocking {
+        val (_, session, controller) = setup()
+        controller.login("grisha@example.com", "demo12345"); awaitIdle(controller)
+        val pet = session.getPets(1).first()
+        val task = session.getTaskItems(1, pet.id).first()
+        controller.openTaskLink(TaskLink(task.task.id, Long.MAX_VALUE)); awaitIdle(controller)
+        assertNull(controller.state.value.linkedTask)
+        assertTrue(controller.state.value.error.orEmpty().contains("недоступна"))
+    }
+
+    @Test fun taskLink_otherAccount_seesNoTaskData(): Unit = runBlocking {
         val (r, session, c) = setup()
         r.login("grisha@example.com", "demo12345")
         val dachaTask = session.getTaskItems(2, session.getPets(2).first().id).first()
@@ -196,7 +206,7 @@ class GroupTelegramAccessTest {
         assertFalse(error.contains(dachaTask.task.title)) // название задачи не раскрывается
     }
 
-    @Test fun accessRevoked_closesOnlyThatSpace() = runBlocking {
+    @Test fun accessRevoked_closesOnlyThatSpace(): Unit = runBlocking {
         val (_, _, c) = setup()
         c.login("grisha@example.com", "demo12345"); awaitIdle(c)
         c.selectSpace(2)
@@ -206,7 +216,7 @@ class GroupTelegramAccessTest {
         assertTrue(c.state.value.spaces.any { it.id == 1L })
     }
 
-    @Test fun homeController_reportsAccessLoss_insteadOfSwitchingItself() = runBlocking {
+    @Test fun homeController_reportsAccessLoss_insteadOfSwitchingItself(): Unit = runBlocking {
         val repo = ControlledRepo()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val lost = mutableListOf<Long>()

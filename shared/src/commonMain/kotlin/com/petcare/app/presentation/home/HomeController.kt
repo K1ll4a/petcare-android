@@ -68,12 +68,16 @@ class HomeController(
                 _state.value = HomeUiState.Error(it.toUserMessage("Не удалось загрузить пространства"))
                 return@launch
             }
+            val selected = list.firstOrNull { it.id == preferSpaceId }
+            if (preferSpaceId != null && selected == null && onAccessLost != null) {
+                onAccessLost.invoke(preferSpaceId)
+                return@launch
+            }
             if (list.isEmpty()) {
                 _state.value = HomeUiState.NoSpaces()
                 return@launch
             }
-            val space = list.firstOrNull { it.id == preferSpaceId } ?: list.first()
-            openSpace(list, space, gen)
+            openSpace(list, selected ?: list.first(), gen)
         }
     }
 

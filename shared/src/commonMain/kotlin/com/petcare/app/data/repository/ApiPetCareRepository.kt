@@ -81,11 +81,11 @@ fun Space.zoneOrThrow() = zone
     ?: throw InvalidServerDataException("Неверный часовой пояс пространства «$timezoneId»")
 
 /**
- * Из всех доступных строк — экземпляр из ссылки, а если его уже нет в списке,
- * ближайшая строка той же задачи. Строки без пространства не открываются.
+ * Для ссылки с occurrence_id нужен именно указанный экземпляр.
+ * Ссылка без occurrence_id открывает последнюю доступную строку задачи.
  */
 internal fun List<TaskItem>.pickLinkedTask(taskId: Long, occurrenceId: Long?): TaskItem? {
     val own = filter { it.task.id == taskId && it.spaceId != null }
-    return own.firstOrNull { occurrenceId != null && it.occurrenceId == occurrenceId }
-        ?: own.maxByOrNull { it.dueAt }
+    return if (occurrenceId == null) own.maxByOrNull { it.dueAt }
+    else own.firstOrNull { it.occurrenceId == occurrenceId }
 }

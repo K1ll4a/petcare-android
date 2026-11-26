@@ -9,6 +9,7 @@ import com.petcare.app.presentation.common.toUserMessage
 import com.petcare.app.time.instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,11 +46,13 @@ class TelegramController(
     private val _state = MutableStateFlow(TelegramUiState())
     val state: StateFlow<TelegramUiState> = _state.asStateFlow()
     private var job: Job? = null
+    private var pollJob: Job? = null
 
     /** Открытие экрана, возврат приложения на передний план, «Обновить». */
     fun load() {
         if (_state.value.busy) return
         job?.cancel()
+        pollJob?.cancel()
         _state.update { it.copy(loading = true, error = null) }
         job = scope.launch {
             attempt { repo.getStatus() }.fold(
@@ -62,13 +65,14 @@ class TelegramController(
     /** Фоновая проверка подтверждения, пока открыт экран со ссылкой. Ошибки сети не мешают ждать. */
     fun pollConfirmation() {
         val s = _state.value
-        if (!s.waitingForBot || s.busy || s.loading) return
+        if (!s.waitingForBot || s.busy || s.loading || pollJob?.isActive == true) return
         if (isLinkExpired(s.link)) {
             _state.update { it.copy(link = null, notice = "Ссылка истекла. Получите новую.") }
             return
         }
-        scope.launch {
+        pollJob = scope.launch {
             attempt { repo.getStatus() }.onSuccess { status ->
+                ensureActive()
                 _state.update { cur ->
                     if (cur.busy) cur
                     else cur.copy(
@@ -109,12 +113,18 @@ class TelegramController(
     private fun change(fallback: String, block: suspend () -> Unit) {
         if (_state.value.busy) return
         job?.cancel()
+        pollJob?.cancel()
         _state.update { it.copy(busy = true, loading = false, error = null, notice = null) }
         job = scope.launch {
             val result = attempt { block() }
-            _state.update { it.copy(busy = false, error = result.exceptionOrNull()?.toUserMessage(fallback)) }
-            // После ошибки показываем то, что сейчас действительно на сервере.
-            if (result.isFailure) attempt { repo.getStatus() }.onSuccess { status -> _state.update { it.copy(status = status) } }
+            // Сверяем состояние до разблокировки формы, чтобы ответ не затёр результат нового действия.
+            val status = if (result.isFailure) attempt { repo.getStatus() }.getOrNull() else null
+            ensureActive()
+            _state.update { it.copy(
+                busy = false,
+                status = status ?: it.status,
+                error = result.exceptionOrNull()?.toUserMessage(fallback),
+            ) }
         }
     }
 
