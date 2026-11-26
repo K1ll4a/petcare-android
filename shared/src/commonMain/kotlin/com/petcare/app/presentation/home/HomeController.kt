@@ -37,6 +37,12 @@ class HomeController(
     private val pets: PetRepository,
     private val tasks: TaskRepository,
     private val clock: Clock = Clock.System,
+    /**
+     * Сервер подтвердил отзыв доступа к пространству (403). Если задан — решает экран аккаунта:
+     * закрывает это пространство целиком вместе с кешем (задача #28). Иначе контроллер сам
+     * переключается на другое доступное пространство.
+     */
+    private val onAccessLost: ((spaceId: Long) -> Unit)? = null,
 ) {
     private val _state = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
@@ -62,12 +68,16 @@ class HomeController(
                 _state.value = HomeUiState.Error(it.toUserMessage("Не удалось загрузить пространства"))
                 return@launch
             }
+            val selected = list.firstOrNull { it.id == preferSpaceId }
+            if (preferSpaceId != null && selected == null && onAccessLost != null) {
+                onAccessLost.invoke(preferSpaceId)
+                return@launch
+            }
             if (list.isEmpty()) {
                 _state.value = HomeUiState.NoSpaces()
                 return@launch
             }
-            val space = list.firstOrNull { it.id == preferSpaceId } ?: list.first()
-            openSpace(list, space, gen)
+            openSpace(list, selected ?: list.first(), gen)
         }
     }
 
@@ -290,6 +300,13 @@ class HomeController(
     private fun handleAccessLost(errors: List<Throwable>): Boolean {
         if (errors.none { it is ApiException && it.isAccessLost }) return false
         val current = ready ?: return false
+        onAccessLost?.let { notify ->
+            newGeneration()
+            // Данные закрытого пространства сразу убираются с экрана, не дожидаясь навигации.
+            _state.value = HomeUiState.Loading
+            notify(current.space.id)
+            return true
+        }
         val rest = current.spaces.filterNot { it.id == current.space.id }
         val message = "Доступ к пространству «${current.space.name}» закрыт. Его данные убраны с экрана."
         if (rest.isEmpty()) {

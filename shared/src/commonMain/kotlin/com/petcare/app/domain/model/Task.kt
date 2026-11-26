@@ -59,6 +59,10 @@ data class TaskItem(
     val spaceId: Long? = null,
     /** Ключ строки от сервера (item_id, например "7:2026-10-22" или "7:once"). */
     val serverItemId: String? = null,
+    /** Экземпляр ежедневной задачи (occurrence_id); нужен ссылке из Telegram и выполнению. */
+    val occurrenceId: Long? = null,
+    /** Выполнение (completion_id); null — ещё не выполнено. */
+    val completionId: Long? = null,
 ) {
     /** Уникальный ключ строки списка: у ежедневной задачи один id на много дней. */
     val key: String

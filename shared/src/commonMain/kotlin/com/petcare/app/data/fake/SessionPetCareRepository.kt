@@ -22,6 +22,15 @@ class SessionPetCareRepository(
     override suspend fun createTask(space: Space, draft: TaskDraft) = guarded(space.id) { data.createTask(space, draft) }
     override suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft) = guarded(space.id) { data.updateTask(space, taskId, original, draft) }
 
+    /** Только пространства, где аккаунт состоит сейчас: чужая задача не находится (AC-15). */
+    override suspend fun findTask(taskId: Long, occurrenceId: Long?): TaskItem? {
+        val session = accounts.session.value ?: unauthorized()
+        val allowed = accounts.getSpaces().map { it.id }.toSet()
+        val item = data.findTaskItem(taskId, occurrenceId, allowed)
+        if (session != accounts.session.value) unauthorized()
+        return item?.takeIf { it.spaceId != null && runCatching { accounts.requireSpace(it.spaceId) }.isSuccess }
+    }
+
     private suspend fun <T> guarded(spaceId: Long, block: suspend () -> T): T {
         val session = accounts.session.value ?: unauthorized()
         val space = accounts.requireSpace(spaceId)

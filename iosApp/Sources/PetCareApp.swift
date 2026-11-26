@@ -11,6 +11,11 @@ struct PetCareRootView: UIViewControllerRepresentable {
 @main
 struct PetCareApp: App {
     var body: some Scene {
-        WindowGroup { PetCareRootView().ignoresSafeArea() }
+        WindowGroup {
+            PetCareRootView()
+                .ignoresSafeArea()
+                // Ссылка из Telegram: petcare://tasks/{task_id}?occurrence_id={id}.
+                .onOpenURL { url in _ = MainViewControllerKt.handleDeepLink(url: url.absoluteString) }
+        }
     }
 }

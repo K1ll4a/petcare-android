@@ -47,6 +47,12 @@ interface TaskRepository {
     suspend fun createTask(space: Space, draft: TaskDraft): Long
     /** [original] — задача до правки: серверу уходят только изменённые поля (PATCH). */
     suspend fun updateTask(space: Space, taskId: Long, original: TaskDraft, draft: TaskDraft): Long
+
+    /**
+     * Задача по ссылке из Telegram — только среди пространств текущего аккаунта.
+     * null — задачи нет или она чужая: содержание не раскрывается (FR-22, AC-15).
+     */
+    suspend fun findTask(taskId: Long, occurrenceId: Long?): TaskItem? = null
 }
 
 /** Ответ сервера с ошибкой в формате API.md §2: {code, message, fields}. */

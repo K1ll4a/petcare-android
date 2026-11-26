@@ -49,6 +49,8 @@ fun TaskDto.toDomain(): TaskItem = TaskItem(
     completedAt = completedAt?.let(Instant::fromEpochSeconds),
     spaceId = spaceId,
     serverItemId = itemId?.takeIf { it.isNotBlank() },
+    occurrenceId = occurrenceId,
+    completionId = completionId,
 )
 
 /**

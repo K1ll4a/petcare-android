@@ -7,6 +7,7 @@ import kotlin.time.Duration.Companion.seconds
 import com.petcare.app.data.mapper.toDomain
 import com.petcare.app.data.remote.dto.PetDto
 import com.petcare.app.data.remote.dto.TaskDto
+import com.petcare.app.data.repository.pickLinkedTask
 import com.petcare.app.data.repository.zoneOrThrow
 import com.petcare.app.domain.model.Member
 import com.petcare.app.domain.model.Pet
@@ -174,6 +175,32 @@ class FakePetCareRepository(
     }
 
     // ---------- имитация сервера ----------
+
+    /** Ссылка из Telegram: задача ищется только в переданных пространствах аккаунта. */
+    suspend fun findTaskItem(taskId: Long, occurrenceId: Long?, allowedSpaces: Set<Long>): TaskItem? {
+        simulate(failable = true)
+        data()
+        return lock.withLock {
+            tasks.filter { it.spaceId in allowedSpaces }.map { it.toDomain() }
+        }.pickLinkedTask(taskId, occurrenceId)
+    }
+
+    /**
+     * Участник ушёл или удалён (FR-22): его незавершённые задачи и расписания переходят владельцу.
+     * Выполненные, пропущенные и отменённые строки не меняются — история остаётся прежней (BR-04).
+     */
+    suspend fun reassignOpenTasks(spaceId: Long, fromUserId: Long, toUserId: Long, toName: String) {
+        data()
+        lock.withLock {
+            for (index in tasks.indices) {
+                val t = tasks[index]
+                val open = t.status != "done" && t.status != "missed" && t.status != "cancelled"
+                if (t.spaceId == spaceId && t.responsibleId == fromUserId && open) {
+                    tasks[index] = t.copy(responsibleId = toUserId, responsibleName = toName)
+                }
+            }
+        }
+    }
 
     private suspend fun simulate(failable: Boolean) {
         delay(if (scenario == FakeScenario.SLOW) 3_000 else baseDelayMs)

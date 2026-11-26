@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.petcare.app.domain.model.SpaceRole
 
 @Composable
-fun AuthScreen(state: AccountUiState, controller: AccountController) {
+fun AuthScreen(state: AccountUiState, controller: AccountController, notice: String? = null) {
     var register by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
@@ -32,6 +32,7 @@ fun AuthScreen(state: AccountUiState, controller: AccountController) {
         Text("PetCare", style = MaterialTheme.typography.headlineLarge)
         Text("Уход за питомцами вместе с близкими")
         Text("Учебная демонстрация · данные на этом устройстве", style = MaterialTheme.typography.labelMedium)
+        notice?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
         if (register) OutlinedTextField(name, { name = it }, label = { Text("Имя") }, enabled = !state.busy, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(email, { email = it }, label = { Text("Email") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email), enabled = !state.busy, singleLine = true, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(password, { password = it }, label = { Text("Пароль") }, supportingText = { if (register) Text("Не менее 8 символов") }, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), enabled = !state.busy, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -122,7 +123,7 @@ fun InvitationsScreen(state: AccountUiState, spaceId: Long, controller: AccountC
 }
 
 @Composable
-private fun OperationMessage(state: AccountUiState, controller: AccountController, showRetry: Boolean = true) {
+internal fun OperationMessage(state: AccountUiState, controller: AccountController, showRetry: Boolean = true) {
     if (state.busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Подождите…") }
     state.error?.let {
         Text(it, color = MaterialTheme.colorScheme.error)
